@@ -267,7 +267,7 @@
 					{#if !tab.permanent}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span
-							class="flex items-center justify-center w-4 h-4 rounded text-gray-400 opacity-0 hover:bg-gray-300 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white transition-opacity duration-100"
+							class="flex items-center justify-center w-4 h-4 rounded text-gray-400 hover:bg-gray-300 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
 							onclick={(e) => handleClose(e, tab.id)}
 							onkeydown={(e) => { if (e.key === 'Enter') handleClose(e, tab.id); }}
 							role="button"
@@ -342,9 +342,7 @@
 <style>
 	@reference "../../app.css";
 
-	button:hover > span[role="button"] {
-		opacity: 1;
-	}
+
 
 	.group-tabs-row {
 		scrollbar-width: none;
