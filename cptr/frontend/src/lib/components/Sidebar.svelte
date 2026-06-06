@@ -95,7 +95,7 @@
 			href="/"
 			class="flex items-center gap-1.5 text-xs font-semibold tracking-tight text-gray-900 dark:text-white"
 			onclick={(e) => { e.preventDefault(); goto('/'); if (typeof window !== 'undefined' && window.innerWidth < 768) sidebarOpen.set(false); }}
-		><img src="/favicon.svg" alt="cptr logo" class="w-4 h-4" />cptr</a>
+		><img src="/favicon.png" alt="cptr logo" class="w-4 h-4" />cptr</a>
 			<button
 				class="flex items-center justify-center w-7 h-7 rounded-lg text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-400 transition-colors duration-100"
 				onclick={() => sidebarOpen.set(false)}
