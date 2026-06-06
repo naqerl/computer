@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { mount, unmount } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
 	import { Markdown } from '@tiptap/markdown';
@@ -7,6 +8,9 @@
 	import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 	import { all, createLowlight } from 'lowlight';
 
+	import { createFileMention, extractMentionedFiles, type FileMentionAttrs } from './FileMention';
+	import FileSuggestionPopup from './FileSuggestionPopup.svelte';
+	import { searchFiles } from '$lib/apis/files';
 	import ModelSelector from './ModelSelector.svelte';
 	import SendButton from './SendButton.svelte';
 	import PlusMenu from './PlusMenu.svelte';
@@ -18,6 +22,7 @@
 		selectedModel: string;
 		sending: boolean;
 		streaming?: boolean;
+		workspace?: string;
 		placeholder?: string;
 		queuedMessages?: { id: string; content: string }[];
 		onsend: () => void;
@@ -31,6 +36,7 @@
 		selectedModel = $bindable(),
 		sending,
 		streaming = false,
+		workspace = '',
 		placeholder = 'Message...',
 		queuedMessages = [],
 		onsend,
@@ -51,9 +57,127 @@
 		return _origHighlight(lang, value, opts);
 	};
 
+	// ── @file mention suggestion ────────────────────
+	let popupEl: HTMLDivElement | null = null;
+	let popupComponent: Record<string, any> | null = null;
+
+	async function fetchSuggestions({ query }: { query: string }): Promise<FileMentionAttrs[]> {
+		if (!workspace) return [];
+		try {
+			const data = await searchFiles(query || '', workspace);
+			const results = (data as any).results ?? [];
+			return results.slice(0, 10).map((r: any) => ({
+				id: r.path,
+				label: r.name,
+				type: r.type === 'directory' ? 'directory' : 'file',
+			}));
+		} catch {
+			return [];
+		}
+	}
+
+	function mountPopup(items: FileMentionAttrs[], selectedIdx: number, onselect: (i: number) => void) {
+		// Destroy previous instance
+		if (popupComponent) {
+			try { unmount(popupComponent); } catch {}
+			popupComponent = null;
+		}
+		if (!popupEl) {
+			popupEl = document.createElement('div');
+			document.body.appendChild(popupEl);
+		}
+		popupComponent = mount(FileSuggestionPopup, {
+			target: popupEl,
+			props: { items, selectedIndex: selectedIdx, onselect },
+		});
+	}
+
+	function createSuggestionRenderer() {
+		let selectedIndex = 0;
+		let currentItems: FileMentionAttrs[] = [];
+		let command: ((attrs: FileMentionAttrs) => void) | null = null;
+
+		function doSelect(index: number) {
+			const item = currentItems[index];
+			if (item && command) command(item);
+		}
+
+		function remount() {
+			mountPopup(currentItems, selectedIndex, doSelect);
+		}
+
+		return {
+			onStart(props: any) {
+				command = props.command;
+				currentItems = props.items;
+				selectedIndex = 0;
+				remount();
+				updatePopupPosition(props.clientRect?.());
+			},
+			onUpdate(props: any) {
+				command = props.command;
+				currentItems = props.items;
+				selectedIndex = 0;
+				remount();
+				updatePopupPosition(props.clientRect?.());
+			},
+			onKeyDown({ event }: { event: KeyboardEvent }) {
+				if (event.key === 'ArrowDown') {
+					selectedIndex = (selectedIndex + 1) % Math.max(currentItems.length, 1);
+					remount();
+					return true;
+				}
+				if (event.key === 'ArrowUp') {
+					selectedIndex = (selectedIndex - 1 + currentItems.length) % Math.max(currentItems.length, 1);
+					remount();
+					return true;
+				}
+				if (event.key === 'Enter') {
+					const item = currentItems[selectedIndex];
+					if (item && command) command(item);
+					return true;
+				}
+				if (event.key === 'Escape') {
+					destroyPopup();
+					return true;
+				}
+				return false;
+			},
+			onExit() {
+				destroyPopup();
+			},
+		};
+	}
+
+	function updatePopupPosition(rect: DOMRect | null) {
+		if (!popupEl || !rect) return;
+		const child = popupEl.firstElementChild as HTMLElement | null;
+		if (!child) return;
+		const popupHeight = child.offsetHeight || 200;
+		child.style.position = 'fixed';
+		child.style.left = `${Math.max(8, Math.min(rect.left, window.innerWidth - 320))}px`;
+		child.style.top = `${rect.top - popupHeight - 8}px`;
+	}
+
+	function destroyPopup() {
+		if (popupComponent) {
+			try { unmount(popupComponent); } catch {}
+			popupComponent = null;
+		}
+		if (popupEl) {
+			popupEl.remove();
+			popupEl = null;
+		}
+	}
+
 	// ── Editor lifecycle ────────────────────────────
 	onMount(() => {
 		if (!editorEl) return;
+
+		const fileMention = createFileMention({
+			items: fetchSuggestions,
+			render: createSuggestionRenderer,
+		});
 
 		editor = new Editor({
 			element: editorEl,
@@ -65,6 +189,7 @@
 				Markdown,
 				Placeholder.configure({ placeholder }),
 				CodeBlockLowlight.configure({ lowlight }),
+				fileMention,
 			],
 			content: inputText || '',
 			contentType: inputText ? 'markdown' : undefined,
@@ -76,6 +201,8 @@
 				},
 				handleKeyDown: (view, event) => {
 					if (event.key === 'Enter' && !event.shiftKey) {
+						// Don't send while suggestion popup is open — let it confirm selection
+						if (popupComponent) return false;
 						const { state } = view;
 						const head = state.selection.$head;
 
@@ -103,6 +230,7 @@
 	});
 
 	onDestroy(() => {
+		destroyPopup();
 		editor?.destroy();
 		editor = null;
 	});
@@ -126,6 +254,12 @@
 
 	export function resetHeight() {
 		// TipTap auto-sizes; no-op kept for API compat
+	}
+
+	/** Get file paths from @mentions in the current editor content. */
+	export function getFiles(): string[] {
+		if (!editor) return [];
+		return extractMentionedFiles(editor.getJSON());
 	}
 
 	// Allow sending during streaming (message will be enqueued server-side)

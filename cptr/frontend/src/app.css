@@ -44,10 +44,17 @@
 
 /* Scrollbar - Open WebUI style */
 ::-webkit-scrollbar-thumb {
-  background-color: rgba(67, 67, 67, 0.6);
-  border-color: rgba(0, 0, 0, 1);
+  --tw-border-opacity: 1;
+  background-color: rgba(215, 215, 215, 0.6);
+  border-color: rgba(255, 255, 255, var(--tw-border-opacity));
   border-radius: 9999px;
   border-width: 1px;
+}
+
+/* Dark theme scrollbar styles */
+.dark ::-webkit-scrollbar-thumb {
+  background-color: rgba(67, 67, 67, 0.6);
+  border-color: rgba(0, 0, 0, var(--tw-border-opacity));
 }
 
 ::-webkit-scrollbar {

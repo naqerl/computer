@@ -230,31 +230,52 @@ async def search_files(
     path: str = Query(..., description="Root path to search"),
     limit: int = Query(20, description="Max results"),
 ):
-    """Fuzzy filename search. Walks tree, matches basename case-insensitively."""
+    """Fuzzy filename search. Walks tree, matches basename case-insensitively.
+
+    Results are ranked: exact match > starts-with > contains.
+    Within each tier, shorter names rank higher (more specific match).
+    """
 
     root = Path(path).resolve()
     if not root.exists() or not root.is_dir():
         raise HTTPException(status_code=404, detail=f"Path not found: {path}")
 
     query_lower = query.lower()
-    results: list[SearchResult] = []
+    # Collect all matches first, then rank
+    matches: list[tuple[int, int, SearchResult]] = []  # (score, name_len, result)
+    max_collect = limit * 10  # collect more than needed for ranking
 
     def walk(directory: Path, depth: int = 0):
-        if depth > 8 or len(results) >= limit:
+        if depth > 8 or len(matches) >= max_collect:
             return
         try:
             for item in sorted(directory.iterdir(), key=lambda p: p.name.lower()):
                 if item.name in SEARCH_IGNORE_DIRS or item.name.startswith("."):
                     continue
-                if len(results) >= limit:
+                if len(matches) >= max_collect:
                     return
 
-                if query_lower in item.name.lower():
-                    results.append(SearchResult(
+                name_lower = item.name.lower()
+                if query_lower and query_lower in name_lower:
+                    # Score: 0 = exact, 1 = starts-with, 2 = contains
+                    if name_lower == query_lower:
+                        score = 0
+                    elif name_lower.startswith(query_lower):
+                        score = 1
+                    else:
+                        score = 2
+                    matches.append((score, len(item.name), SearchResult(
                         path=str(item),
                         name=item.name,
                         type="directory" if item.is_dir() else "file",
-                    ))
+                    )))
+                elif not query_lower:
+                    # Empty query: return top-level files
+                    matches.append((2, len(item.name), SearchResult(
+                        path=str(item),
+                        name=item.name,
+                        type="directory" if item.is_dir() else "file",
+                    )))
 
                 if item.is_dir():
                     walk(item, depth + 1)
@@ -262,7 +283,9 @@ async def search_files(
             pass
 
     walk(root)
-    return SearchResponse(results=results)
+    # Sort by score (lower = better), then by name length (shorter = better)
+    matches.sort(key=lambda m: (m[0], m[1]))
+    return SearchResponse(results=[m[2] for m in matches[:limit]])
 
 
 # ── File management ──────────────────────────────────────────────

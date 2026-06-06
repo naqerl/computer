@@ -1,287 +1,241 @@
 <script lang="ts">
+    import type { HighlighterCore } from "shiki/core";
 
-	interface Props {
-		language: string;
-		code: string;
-		/** Optional diff-style callbacks for chat tool approval */
-		onapply?: ((code: string) => void) | undefined;
-		onreject?: (() => void) | undefined;
-	}
+    interface Props {
+        language: string;
+        code: string;
+        /** Optional diff-style callbacks for chat tool approval */
+        onapply?: ((code: string) => void) | undefined;
+        onreject?: (() => void) | undefined;
+    }
 
-	let { language, code, onapply, onreject }: Props = $props();
+    let { language, code, onapply, onreject }: Props = $props();
 
-	let codeEl: HTMLElement | undefined = $state();
-	let highlighted = $state(false);
-	let copied = $state(false);
+    let codeEl: HTMLElement | undefined = $state();
+    let copied = $state(false);
 
-	// Detect diff blocks
-	let isDiff = $derived(language === 'diff');
+    // Detect diff blocks
+    let isDiff = $derived(language === "diff");
 
-	// Parse diff lines for coloring
-	let diffLines = $derived.by(() => {
-		if (!isDiff) return [];
-		return code.split('\n').map(line => ({
-			text: line,
-			type: line.startsWith('+') ? 'add' as const
-				: line.startsWith('-') ? 'del' as const
-				: line.startsWith('@@') ? 'range' as const
-				: 'ctx' as const,
-		}));
-	});
+    // Parse diff lines for coloring
+    let diffLines = $derived.by(() => {
+        if (!isDiff) return [];
+        return code.split("\n").map((line) => ({
+            text: line,
+            type: line.startsWith("+")
+                ? ("add" as const)
+                : line.startsWith("-")
+                  ? ("del" as const)
+                  : line.startsWith("@@")
+                    ? ("range" as const)
+                    : ("ctx" as const),
+        }));
+    });
 
-	// Cache hljs module
-	let hljsModule: any = null;
+    // Lazy-loaded Shiki highlighter singleton
+    let highlighterPromise: Promise<HighlighterCore> | null = null;
 
-	// Highlight non-diff code: reactive so it re-runs on prop changes (streaming)
-	$effect(() => {
-		if (isDiff || !codeEl) return;
-		const currentCode = code;
-		const currentLang = language;
+    async function getHighlighter(): Promise<HighlighterCore> {
+        if (!highlighterPromise) {
+            highlighterPromise = (async () => {
+                const { createHighlighterCore } = await import("shiki/core");
+                const { createOnigurumaEngine } = await import(
+                    "shiki/engine/oniguruma"
+                );
+                const hl = await createHighlighterCore({
+                    themes: [
+                        import("shiki/themes/github-light.mjs"),
+                        import("shiki/themes/github-dark.mjs"),
+                    ],
+                    langs: [
+                        import("shiki/langs/javascript.mjs"),
+                        import("shiki/langs/typescript.mjs"),
+                        import("shiki/langs/python.mjs"),
+                        import("shiki/langs/bash.mjs"),
+                        import("shiki/langs/shell.mjs"),
+                        import("shiki/langs/json.mjs"),
+                        import("shiki/langs/html.mjs"),
+                        import("shiki/langs/css.mjs"),
+                        import("shiki/langs/markdown.mjs"),
+                        import("shiki/langs/yaml.mjs"),
+                        import("shiki/langs/toml.mjs"),
+                        import("shiki/langs/rust.mjs"),
+                        import("shiki/langs/go.mjs"),
+                        import("shiki/langs/c.mjs"),
+                        import("shiki/langs/cpp.mjs"),
+                        import("shiki/langs/java.mjs"),
+                        import("shiki/langs/sql.mjs"),
+                        import("shiki/langs/svelte.mjs"),
+                        import("shiki/langs/dockerfile.mjs"),
+                        import("shiki/langs/xml.mjs"),
+                        import("shiki/langs/ruby.mjs"),
+                        import("shiki/langs/php.mjs"),
+                        import("shiki/langs/swift.mjs"),
+                        import("shiki/langs/kotlin.mjs"),
+                        import("shiki/langs/lua.mjs"),
+                        import("shiki/langs/tsx.mjs"),
+                        import("shiki/langs/jsx.mjs"),
+                        import("shiki/langs/scss.mjs"),
+                        import("shiki/langs/graphql.mjs"),
+                        import("shiki/langs/makefile.mjs"),
+                    ],
+                    engine: createOnigurumaEngine(import("shiki/wasm")),
+                });
+                return hl;
+            })();
+        }
+        return highlighterPromise;
+    }
 
-		(async () => {
-			try {
-				if (!hljsModule) {
-					hljsModule = (await import('highlight.js')).default;
-				}
-				if (codeEl && currentCode === code) {
-					if (currentLang && hljsModule.getLanguage(currentLang)) {
-						codeEl.innerHTML = hljsModule.highlight(currentCode, { language: currentLang }).value;
-					} else {
-						codeEl.innerHTML = hljsModule.highlightAuto(currentCode).value;
-					}
-					highlighted = true;
-				}
-			} catch {
-				// Fallback: just show plain text
-			}
-		})();
-	});
+    // Highlight non-diff code: reactive so it re-runs on prop changes (streaming)
+    $effect(() => {
+        if (isDiff || !codeEl) return;
+        const currentCode = code;
+        const currentLang = language;
 
-	function handleCopy() {
-		navigator.clipboard.writeText(code);
-		copied = true;
-		setTimeout(() => { copied = false; }, 2000);
-	}
+        (async () => {
+            try {
+                const hl = await getHighlighter();
+                if (!codeEl || currentCode !== code) return;
+
+                const lang =
+                    currentLang && hl.getLoadedLanguages().includes(currentLang)
+                        ? currentLang
+                        : "text";
+
+                const html = hl.codeToHtml(currentCode, {
+                    lang,
+                    themes: { light: "github-light", dark: "github-dark" },
+                    defaultColor: false, // use CSS variables for theme switching
+                });
+
+                // Shiki wraps in <pre style="--shiki-light:...;--shiki-dark:..."><code>...</code></pre>
+                // We extract the <code> innerHTML but must also transfer the CSS vars
+                // from <pre> onto our own <code> so base-color vars resolve.
+                const tmp = document.createElement("div");
+                tmp.innerHTML = html;
+                const shikiPre = tmp.querySelector("pre");
+                const shikiCode = tmp.querySelector("code");
+                if (shikiCode && codeEl) {
+                    codeEl.innerHTML = shikiCode.innerHTML;
+                    // Copy --shiki-* CSS vars from the discarded <pre> onto our <code>
+                    if (shikiPre) {
+                        const preStyle = shikiPre.getAttribute("style") || "";
+                        const vars =
+                            preStyle.match(/--shiki[\w-]*:[^;]+/g) || [];
+                        vars.forEach((v) => {
+                            const [name, val] = v.split(":");
+                            if (name && val)
+                                codeEl!.style.setProperty(
+                                    name.trim(),
+                                    val.trim(),
+                                );
+                        });
+                    }
+                }
+            } catch {
+                // Fallback: just show plain text
+            }
+        })();
+    });
+
+    function handleCopy() {
+        navigator.clipboard.writeText(code);
+        copied = true;
+        setTimeout(() => {
+            copied = false;
+        }, 2000);
+    }
 </script>
 
-<div class="code-block">
-	<div class="code-header">
-		<span class="code-lang">{language || 'text'}</span>
-		<div class="code-actions">
-			{#if isDiff && onapply}
-				<button class="code-action apply" onclick={() => onapply?.(code)}>Apply</button>
-				<button class="code-action reject" onclick={() => onreject?.()}>Reject</button>
-			{/if}
-			<button class="code-action copy" onclick={handleCopy}>
-				{copied ? '✓' : 'Copy'}
-			</button>
-		</div>
-	</div>
+<div
+    class="not-prose rounded-2xl overflow-hidden bg-black/[0.03] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06]"
+>
+    <div class="flex items-center justify-between h-[30px] px-2.5">
+        <span class="text-[11px] font-medium text-gray-500 lowercase"
+            >{language || "text"}</span
+        >
+        <div class="flex items-center gap-1">
+            {#if isDiff && onapply}
+                <button
+                    class="text-[11px] px-2 py-0.5 rounded text-green-600 hover:bg-green-600/10 transition-all duration-100"
+                    onclick={() => onapply?.(code)}>Apply</button
+                >
+                <button
+                    class="text-[11px] px-2 py-0.5 rounded text-red-600 hover:bg-red-600/10 transition-all duration-100"
+                    onclick={() => onreject?.()}>Reject</button
+                >
+            {/if}
+            <button
+                class="text-[11px] px-2 py-0.5 rounded text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/[0.08] transition-all duration-100"
+                onclick={handleCopy}
+            >
+                {copied ? "✓" : "Copy"}
+            </button>
+        </div>
+    </div>
 
-	{#if isDiff}
-		<pre class="code-pre diff"><code>{#each diffLines as line}<span class="diff-line diff-{line.type}">{line.text}
-</span>{/each}</code></pre>
-	{:else}
-		<pre class="code-pre"><code bind:this={codeEl}>{code}</code></pre>
-	{/if}
+    {#if isDiff}
+        <pre
+            class="!m-0 !pb-3 !px-4 overflow-x-auto text-[13px] leading-normal !bg-transparent font-mono"><code
+                >{#each diffLines as line}<span
+                        class="diff-line diff-{line.type}"
+                        >{line.text}
+</span>{/each}</code
+            ></pre>
+    {:else}
+        <pre
+            class="!m-0 !pb-3 !px-4 overflow-x-auto text-[13px] leading-normal !bg-transparent text-[#24292e] dark:text-[#e1e4e8] font-mono"><code
+                class="font-[inherit]"
+                bind:this={codeEl}>{code}</code
+            ></pre>
+    {/if}
 </div>
 
 <style>
-	@reference "../../../app.css";
+    @reference "../../../app.css";
 
-	.code-block {
-		border-radius: 8px;
-		overflow: hidden;
-		background: var(--color-gray-100);
-		border: 1px solid var(--color-gray-200);
-	}
+    /* ── Shiki dual-theme: switch via CSS variables ── */
 
-	:global(.dark) .code-block {
-		background: rgba(255, 255, 255, 0.03);
-		border-color: rgba(255, 255, 255, 0.06);
-	}
+    pre :global(span) {
+        color: var(--shiki-light);
+    }
 
-	.code-header {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		height: 30px;
-		padding: 0 10px;
-		border-bottom: 1px solid var(--color-gray-200);
-		background: var(--color-gray-50);
-	}
+    :global(.dark) pre :global(span) {
+        color: var(--shiki-dark);
+    }
 
-	:global(.dark) .code-header {
-		border-bottom-color: rgba(255, 255, 255, 0.06);
-		background: rgba(255, 255, 255, 0.02);
-	}
+    /* ── Diff line coloring ──────────────────────── */
 
-	.code-lang {
-		font-size: 11px;
-		font-weight: 500;
-		color: var(--color-gray-500);
-		text-transform: lowercase;
-	}
+    .diff-line {
+        display: block;
+    }
 
-	.code-actions {
-		display: flex;
-		align-items: center;
-		gap: 4px;
-	}
+    .diff-line.diff-add {
+        background: rgba(22, 163, 74, 0.1);
+        color: #16a34a;
+    }
 
-	.code-action {
-		font-size: 11px;
-		padding: 2px 8px;
-		border-radius: 4px;
-		color: var(--color-gray-500);
-		transition: all 0.1s;
-	}
+    :global(.dark) .diff-line.diff-add {
+        background: rgba(34, 197, 94, 0.1);
+        color: #4ade80;
+    }
 
-	.code-action:hover {
-		color: var(--color-gray-700);
-		background: var(--color-gray-200);
-	}
+    .diff-line.diff-del {
+        background: rgba(220, 38, 38, 0.08);
+        color: #dc2626;
+    }
 
-	:global(.dark) .code-action:hover {
-		color: var(--color-gray-300);
-		background: rgba(255, 255, 255, 0.08);
-	}
+    :global(.dark) .diff-line.diff-del {
+        background: rgba(248, 113, 113, 0.1);
+        color: #f87171;
+    }
 
-	.code-action.apply {
-		color: #16a34a;
-	}
+    .diff-line.diff-range {
+        color: #8b5cf6;
+    }
 
-	.code-action.apply:hover {
-		background: rgba(22, 163, 74, 0.1);
-	}
-
-	.code-action.reject {
-		color: #dc2626;
-	}
-
-	.code-action.reject:hover {
-		background: rgba(220, 38, 38, 0.1);
-	}
-
-	.code-pre {
-		margin: 0;
-		padding: 12px 16px;
-		overflow-x: auto;
-		font-size: 13px;
-		line-height: 1.5;
-		font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-	}
-
-	.code-pre code {
-		font-family: inherit;
-	}
-
-	/* ── Diff line coloring ──────────────────────── */
-
-	.diff-line {
-		display: block;
-	}
-
-	.diff-line.diff-add {
-		background: rgba(22, 163, 74, 0.1);
-		color: #16a34a;
-	}
-
-	:global(.dark) .diff-line.diff-add {
-		background: rgba(34, 197, 94, 0.1);
-		color: #4ade80;
-	}
-
-	.diff-line.diff-del {
-		background: rgba(220, 38, 38, 0.08);
-		color: #dc2626;
-	}
-
-	:global(.dark) .diff-line.diff-del {
-		background: rgba(248, 113, 113, 0.1);
-		color: #f87171;
-	}
-
-	.diff-line.diff-range {
-		color: #8b5cf6;
-	}
-
-	:global(.dark) .diff-line.diff-range {
-		color: #a78bfa;
-	}
-
-	/* ── highlight.js token colors ────────────────── */
-
-	.code-pre :global(.hljs-keyword),
-	.code-pre :global(.hljs-selector-tag),
-	.code-pre :global(.hljs-built_in) {
-		color: #d73a49;
-	}
-
-	.code-pre :global(.hljs-string),
-	.code-pre :global(.hljs-attr) {
-		color: #032f62;
-	}
-
-	.code-pre :global(.hljs-comment),
-	.code-pre :global(.hljs-quote) {
-		color: #6a737d;
-		font-style: italic;
-	}
-
-	.code-pre :global(.hljs-number),
-	.code-pre :global(.hljs-literal) {
-		color: #005cc5;
-	}
-
-	.code-pre :global(.hljs-title),
-	.code-pre :global(.hljs-section) {
-		color: #6f42c1;
-	}
-
-	.code-pre :global(.hljs-type),
-	.code-pre :global(.hljs-name) {
-		color: #22863a;
-	}
-
-	.code-pre :global(.hljs-meta) {
-		color: #735c0f;
-	}
-
-	/* Dark mode hljs overrides */
-
-	:global(.dark) .code-pre :global(.hljs-keyword),
-	:global(.dark) .code-pre :global(.hljs-selector-tag),
-	:global(.dark) .code-pre :global(.hljs-built_in) {
-		color: #ff7b72;
-	}
-
-	:global(.dark) .code-pre :global(.hljs-string),
-	:global(.dark) .code-pre :global(.hljs-attr) {
-		color: #a5d6ff;
-	}
-
-	:global(.dark) .code-pre :global(.hljs-comment),
-	:global(.dark) .code-pre :global(.hljs-quote) {
-		color: #8b949e;
-	}
-
-	:global(.dark) .code-pre :global(.hljs-number),
-	:global(.dark) .code-pre :global(.hljs-literal) {
-		color: #79c0ff;
-	}
-
-	:global(.dark) .code-pre :global(.hljs-title),
-	:global(.dark) .code-pre :global(.hljs-section) {
-		color: #d2a8ff;
-	}
-
-	:global(.dark) .code-pre :global(.hljs-type),
-	:global(.dark) .code-pre :global(.hljs-name) {
-		color: #7ee787;
-	}
-
-	:global(.dark) .code-pre :global(.hljs-meta) {
-		color: #d29922;
-	}
+    :global(.dark) .diff-line.diff-range {
+        color: #a78bfa;
+    }
 </style>

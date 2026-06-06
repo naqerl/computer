@@ -60,16 +60,21 @@ def _get_user(request: Request) -> str:
 async def list_chats(
     request: Request,
     workspace: str = Query(..., description="Workspace root path"),
+    limit: int = Query(50, ge=1, le=200, description="Max chats to return"),
+    offset: int = Query(0, ge=0, description="Number of chats to skip"),
+    sort_by: str = Query("updated_at", description="Sort field: 'title' or 'updated_at'"),
+    sort_dir: str = Query("desc", description="Sort direction: 'asc' or 'desc'"),
 ):
     """List chats for a workspace by scanning .cptr/chats/ for JSON files.
 
     Returns chat metadata with relative folder paths for sidebar display.
+    Supports pagination via limit/offset and sorting via sort_by/sort_dir.
     """
     user_id = _get_user(request)
     chats_dir = Path(workspace) / ".cptr" / "chats"
 
     if not chats_dir.exists():
-        return {"chats": []}
+        return {"chats": [], "total": 0, "has_more": False}
 
     # Collect chat IDs and their relative folder paths
     chat_entries: list[dict] = []
@@ -81,7 +86,7 @@ async def list_chats(
         chat_entries.append({"id": chat_id, "folder": rel_folder})
 
     if not chat_entries:
-        return {"chats": []}
+        return {"chats": [], "total": 0, "has_more": False}
 
     # Batch-fetch from DB
     chat_ids = [e["id"] for e in chat_entries]
@@ -104,9 +109,13 @@ async def list_chats(
                 "updated_at": chat.updated_at,
             })
 
-    # Sort: most recently updated first
-    result.sort(key=lambda c: c["updated_at"], reverse=True)
-    return {"chats": result}
+    # Sort by requested field
+    sort_field = sort_by if sort_by in ("title", "updated_at") else "updated_at"
+    reverse = sort_dir != "asc"
+    result.sort(key=lambda c: (c[sort_field] or ""), reverse=reverse)
+    total = len(result)
+    page = result[offset : offset + limit]
+    return {"chats": page, "total": total, "has_more": offset + limit < total}
 
 # ── Models aggregation ──────────────────────────────────────
 # NOTE: Must be declared before /{chat_id} to avoid 'models' being treated as a chat_id.
@@ -354,11 +363,13 @@ async def send_message(body: SendMessageRequest, request: Request):
         assistant_parent = body.parent_id
     else:
         # Normal send: create user message first
+        user_meta = {"files": body.files} if body.files else None
         user_msg = await ChatMessage.create(
             chat_id=chat.id,
             role="user",
             content=body.content,
             parent_id=body.parent_id,
+            meta=user_meta,
             created_at=now_ms(),
         )
         assistant_parent = user_msg.id

@@ -1,5 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
+	import Icon from '../Icon.svelte';
+	import { fileIconName } from '$lib/utils/fileIcon';
 
 	interface Props {
 		content: string;
@@ -9,6 +11,29 @@
 		onnavigate?: (direction: -1 | 1) => void;
 	}
 	let { content, siblingIndex = 0, siblingTotal = 1, onedit, onnavigate }: Props = $props();
+
+	type Segment = { type: 'text'; value: string } | { type: 'file'; label: string; path: string };
+
+	// Matches both [label](file://path) and TipTap's [@ id="path" label="name"]
+	const FILE_LINK_RE = /\[([^\]]+)\]\(file:\/\/([^)]+)\)/g;
+	const TIPTAP_MENTION_RE = /\[@\s+id="([^"]+)"\s+label="([^"]+)"\]/g;
+
+	const parsedContent: Segment[] = $derived.by(() => {
+		// Normalize TipTap format to markdown links first
+		const normalized = content.replace(
+			TIPTAP_MENTION_RE,
+			(_: string, id: string, label: string) => `[${label}](file://${id})`
+		);
+		const segments: Segment[] = [];
+		let last = 0;
+		for (const m of normalized.matchAll(FILE_LINK_RE)) {
+			if (m.index > last) segments.push({ type: 'text', value: normalized.slice(last, m.index) });
+			segments.push({ type: 'file', label: m[1], path: m[2] });
+			last = m.index + m[0].length;
+		}
+		if (last < normalized.length) segments.push({ type: 'text', value: normalized.slice(last) });
+		return segments.length ? segments : [{ type: 'text' as const, value: content }];
+	});
 
 	let edit = $state(false);
 	let editedContent = $state('');
@@ -99,7 +124,7 @@
 		<!-- Bubble: right-aligned -->
 		<div class="flex justify-end">
 			<div class="max-w-[90%] px-4 py-2 rounded-3xl bg-gray-50 dark:bg-white/[0.06]">
-				<div class="text-[13px] leading-relaxed text-gray-900 dark:text-gray-200 whitespace-pre-wrap break-words">{content}</div>
+				<div class="text-[13px] leading-relaxed text-gray-900 dark:text-gray-200 whitespace-pre-wrap break-words">{#each parsedContent as segment}{#if segment.type === 'text'}{segment.value}{:else}<span class="inline-flex items-center gap-0.5 bg-blue-500/10 text-blue-400 rounded px-1.5 py-px mx-0.5 text-xs font-mono align-baseline"><Icon name={fileIconName(segment.label, 'file')} size={11} />{segment.label}</span>{/if}{/each}</div>
 			</div>
 		</div>
 		{#if siblingTotal > 1 || onedit}

@@ -305,6 +305,19 @@ async def _load_message_history(chat_id: str, message_id: str) -> list[dict]:
             continue
         entry: dict = {"role": m.role, "content": m.content or ""}
 
+        # Inject @file mention contents into user messages
+        if m.role == "user":
+            attached_files = (m.meta or {}).get("files", [])
+            if attached_files:
+                file_parts = []
+                for fpath in attached_files:
+                    try:
+                        text = Path(fpath).read_text(errors="replace")[:50_000]
+                        file_parts.append(f"--- {fpath} ---\n{text}")
+                    except Exception:
+                        file_parts.append(f"--- {fpath} --- (unreadable)")
+                entry["content"] += "\n\n" + "\n\n".join(file_parts)
+
         # Reconstruct tool calls from output items for the provider
         if m.output:
             tool_calls = []

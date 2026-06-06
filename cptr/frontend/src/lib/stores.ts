@@ -67,6 +67,7 @@ export type ToolApprovalMode = 'ask' | 'auto' | 'full';
 export interface UserPreferences {
 	theme: Theme;
 	sidebarOpen: boolean;
+	sidebarWidth: number;
 	toolApprovalMode: ToolApprovalMode;
 	locale: string;
 	workspaceOrder?: string[]; // ordered paths for sidebar drag-reorder
@@ -114,6 +115,7 @@ export const workspaceList = writable<{ path: string; name: string }[]>([]);
 
 /** Global user preferences. */
 export const sidebarOpen = writable(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
+export const sidebarWidth = writable(220);
 export const theme = writable<Theme>('dark');
 export const toolApprovalMode = writable<ToolApprovalMode>('auto');
 /** @deprecated Use toolApprovalMode */
@@ -255,6 +257,7 @@ function persistPreferences(): void {
 		const prefs: UserPreferences = {
 			theme: get(theme),
 			sidebarOpen: get(sidebarOpen),
+			sidebarWidth: get(sidebarWidth),
 			toolApprovalMode: get(toolApprovalMode),
 			locale: i18next.language,
 			workspaceOrder: get(workspaceOrder),
@@ -270,6 +273,7 @@ function subscribeForPersistence() {
 	currentWorkspace.subscribe(() => { if (get(stateLoaded)) persistWorkspace(); });
 	theme.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
 	sidebarOpen.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
+	sidebarWidth.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
 	toolApprovalMode.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
 	workspaceOrder.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
 	i18next.on('languageChanged', () => { if (get(stateLoaded)) persistPreferences(); });
@@ -282,6 +286,7 @@ export async function loadPreferences(): Promise<void> {
 		const prefs = await getPreferences();
 		if (prefs.theme) theme.set(prefs.theme as Theme);
 		if (prefs.sidebarOpen !== undefined) sidebarOpen.set(prefs.sidebarOpen as boolean);
+		if (prefs.sidebarWidth !== undefined) sidebarWidth.set(prefs.sidebarWidth as number);
 		// Support new toolApprovalMode and legacy boolean autoApproveTools
 		if (prefs.toolApprovalMode) {
 			toolApprovalMode.set(prefs.toolApprovalMode as ToolApprovalMode);

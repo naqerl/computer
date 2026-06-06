@@ -424,12 +424,12 @@
 					<!-- Tabs (always visible) -->
 					<button
 						class="px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors duration-75
-							{view === 'changes' ? 'bg-gray-100 dark:bg-white/8 text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
+							{view === 'changes' ? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
 						onclick={() => switchView('changes')}
 					>Changes{#if totalChanges > 0}<span class="ml-1 text-gray-400 dark:text-gray-500">{totalChanges}</span>{/if}</button>
 					<button
 						class="px-2.5 h-6 rounded-md text-[11px] font-medium transition-colors duration-75
-							{view === 'history' ? 'bg-gray-100 dark:bg-white/8 text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
+							{view === 'history' ? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
 						onclick={() => switchView('history')}
 					>{$t('git.history')}</button>
 

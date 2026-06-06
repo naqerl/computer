@@ -212,13 +212,40 @@
 		}
 	}
 
+	const CHATS_PAGE_SIZE = 50;
+	let hasMoreChats = $state(false);
+	let chatSortBy = $state<'title' | 'updated_at'>('updated_at');
+	let chatSortDir = $state<'asc' | 'desc'>('desc');
+
 	async function loadPreviousChats() {
 		try {
-			const data = await getChats(workspace);
+			const data = await getChats(workspace, CHATS_PAGE_SIZE, 0, chatSortBy, chatSortDir);
 			previousChats = data.chats || [];
+			hasMoreChats = data.has_more;
 		} catch {
 			previousChats = [];
+			hasMoreChats = false;
 		}
+	}
+
+	async function loadMoreChats() {
+		try {
+			const data = await getChats(workspace, CHATS_PAGE_SIZE, previousChats.length, chatSortBy, chatSortDir);
+			previousChats = [...previousChats, ...(data.chats || [])];
+			hasMoreChats = data.has_more;
+		} catch {
+			hasMoreChats = false;
+		}
+	}
+
+	function handleSort(field: 'title' | 'updated_at') {
+		if (chatSortBy === field) {
+			chatSortDir = chatSortDir === 'asc' ? 'desc' : 'asc';
+		} else {
+			chatSortBy = field;
+			chatSortDir = field === 'title' ? 'asc' : 'desc';
+		}
+		loadPreviousChats();
 	}
 
 	async function openChat(id: string) {
@@ -400,10 +427,16 @@
 	// ── Actions ─────────────────────────────────────────────────
 
 	async function send() {
-		const text = inputText.trim();
+		let text = inputText.trim();
 		if (!text || !selectedModel) return;
 		if (sending) return;
 		sending = true;
+		const files = chatInputEl?.getFiles() ?? [];
+		// Transform TipTap mention format to markdown file links
+		text = text.replace(
+			/\[@\s+id="([^"]+)"\s+label="([^"]+)"\]/g,
+			(_: string, id: string, label: string) => `[${label}](file://${id})`
+		);
 		inputText = '';
 		autoScroll = true;
 		await tick();
@@ -428,7 +461,7 @@
 			} else {
 			try {
 				const mode = get(toolApprovalMode);
-				const result = await apiSendMessage(text, selectedModel, workspace, chatId, parentId, { tool_approval_mode: mode });
+			const result = await apiSendMessage(text, selectedModel, workspace, chatId, parentId, { tool_approval_mode: mode }, undefined, files);
 				if (result.queued) {
 					// Add directly to allMessages so it appears in queue UI instantly
 					allMessages = [...allMessages, {
@@ -480,7 +513,7 @@
 
 		try {
 			const mode = get(toolApprovalMode);
-			const result = await apiSendMessage(text, selectedModel, workspace, chatId ?? undefined, parentId, { tool_approval_mode: mode });
+			const result = await apiSendMessage(text, selectedModel, workspace, chatId ?? undefined, parentId, { tool_approval_mode: mode }, undefined, files);
 			await loadChat(result.chat_id);
 			if (isNew && tabId) {
 				updateTab(tabId, result.chat_id, text.slice(0, 40) || 'Chat');
@@ -700,8 +733,8 @@
 <div class="flex flex-col h-full bg-white dark:bg-black">
 	{#if isLanding}
 		<!-- Landing: input + recent chats -->
-		<div class="flex-1 overflow-y-auto">
-			<div class="max-w-xl mx-auto px-4 flex flex-col" style="padding-top: max(14vh, 48px);">
+		<div class="flex-1 overflow-y-auto flex items-center justify-center">
+		<div class="max-w-xl w-full mx-auto px-4 flex flex-col pb-[5vh]">
 				<!-- Greeting -->
 				<div class="mb-8 text-center">
 					<h1 class="text-lg font-normal text-gray-800 dark:text-gray-200 tracking-tight">
@@ -714,6 +747,7 @@
 					bind:inputText
 					bind:selectedModel
 					{sending}
+					{workspace}
 					placeholder="Ask anything about {workspaceName}..."
 					onsend={send}
 					{queuedMessages}
@@ -721,7 +755,7 @@
 					onqueueedit={handleQueueEdit}
 					onqueuedelete={handleQueueDelete}
 				/>
-				<ChatHistory chats={previousChats} onopen={openChat} ondelete={deleteChat} />
+				<ChatHistory chats={previousChats} onopen={openChat} ondelete={deleteChat} hasMore={hasMoreChats} onloadmore={loadMoreChats} sortBy={chatSortBy} sortDir={chatSortDir} onsort={handleSort} />
 			</div>
 		</div>
 	{:else}
@@ -791,6 +825,7 @@
 					bind:selectedModel
 					{sending}
 					{streaming}
+					{workspace}
 					onsend={send}
 					oncancel={handleCancel}
 					{queuedMessages}

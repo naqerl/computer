@@ -40,8 +40,16 @@ export interface SendMessageResult {
 
 // ── Queries ─────────────────────────────────────────────────
 
-export const getChats = (workspace: string) =>
-	fetchJSON<{ chats: ChatInfo[] }>(`/api/chats?workspace=${encodeURIComponent(workspace)}`);
+export const getChats = (
+	workspace: string,
+	limit = 50,
+	offset = 0,
+	sortBy: 'title' | 'updated_at' = 'updated_at',
+	sortDir: 'asc' | 'desc' = 'desc'
+) =>
+	fetchJSON<{ chats: ChatInfo[]; total: number; has_more: boolean }>(
+		`/api/chats?workspace=${encodeURIComponent(workspace)}&limit=${limit}&offset=${offset}&sort_by=${sortBy}&sort_dir=${sortDir}`
+	);
 
 export const getChat = (chatId: string) =>
 	fetchJSON<ChatDetail>(`/api/chats/${chatId}`);
@@ -58,7 +66,8 @@ export const sendMessage = (
 	chatId?: string,
 	parentId?: string | null,
 	params: { tool_approval_mode?: string } = {},
-	regenerationPrompt?: string
+	regenerationPrompt?: string,
+	files?: string[]
 ) =>
 	fetchJSON<SendMessageResult>(
 		'/api/chats',
@@ -69,6 +78,7 @@ export const sendMessage = (
 			chat_id: chatId,
 			parent_id: parentId ?? null,
 			regeneration_prompt: regenerationPrompt,
+			files: files ?? [],
 			params
 		})
 	);

@@ -7,6 +7,7 @@
 		removeWorkspace,
 		reorderWorkspaces,
 		sidebarOpen,
+		sidebarWidth,
 	} from '$lib/stores';
 	import Sortable from 'sortablejs';
 	import Icon from './Icon.svelte';
@@ -32,6 +33,38 @@
 	let menuButtonEl: HTMLButtonElement | undefined = $state();
 	let wsListEl: HTMLDivElement | undefined = $state();
 	let sortable: Sortable | null = null;
+
+	const MIN_WIDTH = 160;
+	const MAX_WIDTH = 400;
+	let isResizing = $state(false);
+
+	function startResize(e: PointerEvent) {
+		// Only allow resize on md+ screens
+		if (typeof window !== 'undefined' && window.innerWidth < 768) return;
+		e.preventDefault();
+		isResizing = true;
+		const startX = e.clientX;
+		const startWidth = $sidebarWidth;
+
+		function onMove(ev: PointerEvent) {
+			const delta = ev.clientX - startX;
+			const newWidth = Math.round(Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta)));
+			sidebarWidth.set(newWidth);
+		}
+
+		function onUp() {
+			isResizing = false;
+			window.removeEventListener('pointermove', onMove);
+			window.removeEventListener('pointerup', onUp);
+			document.body.style.cursor = '';
+			document.body.style.userSelect = '';
+		}
+
+		window.addEventListener('pointermove', onMove);
+		window.addEventListener('pointerup', onUp);
+		document.body.style.cursor = 'col-resize';
+		document.body.style.userSelect = 'none';
+	}
 
 	// Current workspace path from URL
 	const currentPath = $derived($page.url.searchParams.get('workspace'));
@@ -113,7 +146,16 @@
 {#if $sidebarOpen}
 	<button class="fixed inset-0 bg-black/50 z-40 cursor-default md:hidden" onclick={closeSidebar} aria-label={$t('sidebar.closeSidebar')}></button>
 
-	<aside class="sidebar">
+	<aside class="sidebar" style="--sw: {$sidebarWidth}px;">
+		<!-- Resize handle (md+ only) -->
+		<div
+			class="resize-handle"
+			class:active={isResizing}
+			role="separator"
+			aria-orientation="vertical"
+			onpointerdown={startResize}
+			ondblclick={() => sidebarWidth.set(220)}
+		></div>
 		<!-- Logo header with collapse button -->
 		<div class="flex items-center justify-between h-9 pl-3.5 pr-1.5 shrink-0 border-b border-gray-200 dark:border-white/6">
 			<a
@@ -151,14 +193,14 @@
 					href="/?workspace={encodeURIComponent(ws.path)}"
 					class="group flex items-center gap-1.5 w-full h-7 px-2 rounded-lg text-xs font-medium transition-colors duration-100 no-underline
 						{ws.path === currentPath
-							? 'bg-gray-200 text-gray-900 dark:bg-white/8 dark:text-white'
+							? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
 							: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 					onclick={(e) => handleWorkspaceClick(e, ws.path)}
 				>
 					<Icon name="folder" size={14} />
 					<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">{ws.name}</span>
 					<span
-						class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-300 dark:hover:bg-white/10 transition-all duration-75"
+						class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
 						role="button"
 						tabindex="-1"
 						onclick={(e) => openWsMenu(e, ws.path)}
@@ -261,6 +303,30 @@
 		.sidebar {
 			position: relative;
 			z-index: auto;
+			width: var(--sw, 220px);
+		}
+	}
+
+	.resize-handle {
+		display: none;
+	}
+
+	@media (min-width: 768px) {
+		.resize-handle {
+			display: block;
+			position: absolute;
+			right: -3px;
+			top: 0;
+			bottom: 0;
+			width: 6px;
+			cursor: col-resize;
+			z-index: 10;
+			transition: background 0.15s;
+		}
+
+		.resize-handle:hover,
+		.resize-handle.active {
+			background: rgba(150, 150, 150, 0.12);
 		}
 	}
 </style>

@@ -9,6 +9,7 @@
 	import { systemEvents } from '$lib/stores/systemEvents.svelte';
 	import { tooltip } from '$lib/tooltip';
 	import { listDir, downloadArchive, deleteFiles, moveFile, uploadFiles as apiUpload, createEntry } from '$lib/apis/files';
+	import { fileIconName } from '$lib/utils/fileIcon';
 	import Icon from './Icon.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import { t } from '$lib/i18n';
@@ -269,30 +270,7 @@
 		setFileBrowserCwd(path);
 	}
 
-	function fileIconName(entry: FileEntry): string {
-		if (entry.type === 'directory') return 'folder';
-		const ext = entry.name.split('.').pop()?.toLowerCase() ?? '';
-		if (entry.name === 'Dockerfile') return 'docker';
-		if (entry.name === 'LICENSE' || entry.name === 'LICENSE.md') return 'page-text';
-		if (entry.name.endsWith('.lock')) return 'lock';
-		switch (ext) {
-			case 'md': return 'page-text';
-			case 'ts': case 'tsx': case 'js': case 'jsx':
-			case 'py': case 'rs': case 'go': case 'java':
-			case 'c': case 'cpp': case 'h': case 'hpp':
-			case 'rb': case 'php': case 'swift': case 'kt':
-			case 'svelte': case 'vue':
-				return 'code';
-			case 'json': case 'yaml': case 'yml': case 'toml':
-			case 'ini': case 'cfg': case 'conf':
-				return 'settings';
-			case 'sh': case 'bash': case 'zsh':
-				return 'terminal';
-			case 'css': case 'html': case 'xml':
-				return 'code';
-			default: return 'empty-page';
-		}
-	}
+	// fileIconName imported from $lib/utils/fileIcon
 
 	function formatSize(bytes: number | null): string {
 		if (bytes === null || bytes === undefined) return '';
@@ -755,7 +733,7 @@
 				{#if renamingEntry === entry.path}
 					<!-- Inline rename -->
 					<div class="flex items-center gap-2 h-7" style="padding-left: {8 + entry.depth * 16}px; padding-right: 8px;">
-						<Icon name={fileIconName(entry)} size={14} class="text-gray-400 shrink-0" />
+						<Icon name={fileIconName(entry.name, entry.type)} size={14} class="text-gray-400 shrink-0" />
 						<input
 							type="text"
 							class="flex-1 border-none outline-none bg-transparent text-xs text-gray-900 dark:text-white"
@@ -789,7 +767,7 @@
 							<span class="w-4 shrink-0"></span>
 						{/if}
 						<span class="flex items-center justify-center w-4 shrink-0 {entry.type === 'directory' ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}">
-							<Icon name={fileIconName(entry)} size={14} strokeWidth={1.4} />
+							<Icon name={fileIconName(entry.name, entry.type)} size={14} strokeWidth={1.4} />
 						</span>
 						{#if entry.type === 'directory'}
 							<!-- svelte-ignore a11y_no_static_element_interactions -->

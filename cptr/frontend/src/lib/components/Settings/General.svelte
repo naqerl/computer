@@ -20,7 +20,7 @@
 	] as opt}
 		<button
 			class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs transition-colors duration-100
-				{$theme === opt.value ? 'bg-gray-100 dark:bg-white/8 text-gray-900 dark:text-white font-medium' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+				{$theme === opt.value ? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white font-medium' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 			onclick={() => setTheme(opt.value)}
 		>
 			<Icon name={opt.icon} size={13} />
@@ -48,7 +48,7 @@
 	] as opt}
 		<button
 			class="flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-xs transition-colors duration-100
-				{$streamingBehavior === opt.value ? 'bg-gray-100 dark:bg-white/8 text-gray-900 dark:text-white font-medium' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+				{$streamingBehavior === opt.value ? 'bg-gray-200/50 dark:bg-white/8 text-gray-900 dark:text-white font-medium' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 			onclick={() => streamingBehavior.set(opt.value)}
 		>
 			{opt.label}

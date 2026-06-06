@@ -182,7 +182,7 @@
 						data-index={i}
 						class="flex items-center gap-2 w-full h-7 px-2 rounded-lg text-left transition-colors duration-75
 							{i === selectedIndex
-								? 'bg-gray-100 text-gray-900 dark:bg-white/6 dark:text-white'
+								? 'bg-gray-200/50 text-gray-900 dark:bg-white/6 dark:text-white'
 								: 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/4'}"
 						onclick={() => navigateTo(dir.name)}
 						onmouseenter={() => { selectedIndex = i; }}

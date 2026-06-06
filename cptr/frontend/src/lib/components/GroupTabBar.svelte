@@ -253,7 +253,7 @@
 				<button
 					class="flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all duration-100
 						{isActive
-							? 'bg-gray-200 text-gray-900 dark:bg-white/8 dark:text-white'
+							? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
 							: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
 					data-tab-id={tab.id}
 					onclick={() => handleTabClick(tab)}
@@ -271,7 +271,7 @@
 					{#if !tab.permanent}
 						<!-- svelte-ignore a11y_no_static_element_interactions -->
 						<span
-							class="flex items-center justify-center w-4 h-4 rounded text-gray-400 hover:bg-gray-300 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
+							class="flex items-center justify-center w-4 h-4 rounded text-gray-400 hover:bg-gray-200 hover:text-gray-700 dark:hover:bg-white/10 dark:hover:text-white"
 							onclick={(e) => handleClose(e, tab.id)}
 							onkeydown={(e) => { if (e.key === 'Enter') handleClose(e, tab.id); }}
 							role="button"
@@ -305,7 +305,7 @@
 				bind:this={splitBtnEl}
 				class="flex items-center justify-center w-7 h-7 rounded-lg transition-colors duration-100 shrink-0
 					{$splitActive
-						? 'bg-gray-200 text-gray-900 dark:bg-white/8 dark:text-white'
+						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
 						: 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}"
 				onclick={() => showSplitMenu = !showSplitMenu}
 				aria-label="Split Editor"

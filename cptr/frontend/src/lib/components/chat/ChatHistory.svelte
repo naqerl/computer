@@ -1,12 +1,41 @@
 <script lang="ts">
 	import type { ChatInfo } from '$lib/apis/chat';
+	import DropdownMenu from '../DropdownMenu.svelte';
 
 	interface Props {
 		chats: ChatInfo[];
 		onopen: (id: string) => void;
 		ondelete: (id: string) => void;
+		hasMore?: boolean;
+		onloadmore?: () => void;
+		sortBy?: 'title' | 'updated_at';
+		sortDir?: 'asc' | 'desc';
+		onsort?: (field: 'title' | 'updated_at') => void;
 	}
-	let { chats, onopen, ondelete }: Props = $props();
+	let {
+		chats,
+		onopen,
+		ondelete,
+		hasMore = false,
+		onloadmore,
+		sortBy = 'updated_at',
+		sortDir = 'desc',
+		onsort,
+	}: Props = $props();
+
+	let menuChatId = $state<string | null>(null);
+	let menuAnchor = $state<HTMLElement | null>(null);
+
+	function openMenu(e: MouseEvent, chatId: string) {
+		e.stopPropagation();
+		menuChatId = chatId;
+		menuAnchor = e.currentTarget as HTMLElement;
+	}
+
+	function closeMenu() {
+		menuChatId = null;
+		menuAnchor = null;
+	}
 
 	function formatTime(ts: number): string {
 		const d = new Date(ts);
@@ -20,8 +49,56 @@
 	}
 </script>
 
+{#snippet chevronUp()}
+	<svg class="w-2 h-2" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+		<path d="M1 5L5 1L9 5" />
+	</svg>
+{/snippet}
+
+{#snippet chevronDown()}
+	<svg class="w-2 h-2" viewBox="0 0 10 6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+		<path d="M1 1L5 5L9 1" />
+	</svg>
+{/snippet}
+
 {#if chats.length > 0}
 	<div class="w-full mt-4 pt-2">
+		<!-- Sort header -->
+		{#if onsort}
+			<div class="flex items-center text-[10px] font-medium text-gray-400 dark:text-gray-600 mb-1 px-2 select-none">
+				<button
+					class="flex-1 flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+					onclick={() => onsort?.('title')}
+				>
+					Title
+					{#if sortBy === 'title'}
+						{#if sortDir === 'asc'}
+							{@render chevronUp()}
+						{:else}
+							{@render chevronDown()}
+						{/if}
+					{:else}
+						<span class="invisible">{@render chevronUp()}</span>
+					{/if}
+				</button>
+				<button
+					class="shrink-0 flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+					onclick={() => onsort?.('updated_at')}
+				>
+					Updated
+					{#if sortBy === 'updated_at'}
+						{#if sortDir === 'asc'}
+							{@render chevronUp()}
+						{:else}
+							{@render chevronDown()}
+						{/if}
+					{:else}
+						<span class="invisible">{@render chevronUp()}</span>
+					{/if}
+				</button>
+			</div>
+		{/if}
+
 		{#each chats as chat (chat.id)}
 			<!-- svelte-ignore a11y_no_static_element_interactions -->
 			<div
@@ -31,21 +108,39 @@
 				onclick={() => onopen(chat.id)}
 				onkeydown={(e) => { if (e.key === 'Enter') onopen(chat.id); }}
 			>
-				<svg class="w-3.5 h-3.5 shrink-0 text-gray-300 dark:text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-				</svg>
 				<span class="flex-1 text-xs text-gray-500 dark:text-gray-500 truncate">{chat.title}</span>
-				<span class="text-[10px] text-gray-300 dark:text-gray-700 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity duration-75">{formatTime(chat.updated_at)}</span>
+				<span class="text-[10px] text-gray-300 dark:text-gray-700 shrink-0">{formatTime(chat.updated_at)}</span>
 				<button
-					class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-300 dark:text-gray-700 opacity-0 group-hover:opacity-100 hover:text-red-400 dark:hover:text-red-400 transition-all duration-75"
-					onclick={(e) => { e.stopPropagation(); ondelete(chat.id); }}
-					aria-label="Delete chat"
+					class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 transition-all duration-75"
+					onclick={(e) => openMenu(e, chat.id)}
+					aria-label="Chat options"
 				>
-					<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+					<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
+						<circle cx="3" cy="8" r="1.5" />
+						<circle cx="8" cy="8" r="1.5" />
+						<circle cx="13" cy="8" r="1.5" />
 					</svg>
 				</button>
 			</div>
 		{/each}
+		{#if hasMore && onloadmore}
+			<button
+				class="w-full h-7 mt-1 text-[11px] text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors duration-75"
+				onclick={onloadmore}
+			>
+				Show more
+			</button>
+		{/if}
 	</div>
+{/if}
+
+{#if menuChatId && menuAnchor}
+	<DropdownMenu
+		anchor={menuAnchor}
+		align="end"
+		items={[
+			{ label: 'Delete', icon: 'trash', onclick: () => { if (menuChatId) ondelete(menuChatId); } },
+		]}
+		onclose={closeMenu}
+	/>
 {/if}
