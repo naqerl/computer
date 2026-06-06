@@ -194,10 +194,12 @@ async def search_files(
 
     # Try ripgrep first
     try:
-        return await _search_rg(query, full, regex, case_insensitive, include, filenames_only)
+        res = await _search_rg(query, full, regex, case_insensitive, include, filenames_only)
     except FileNotFoundError:
         # ripgrep not installed, fall back to Python
-        return await _search_python(query, full, case_insensitive)
+        res = await _search_python(query, full, case_insensitive)
+
+    return _truncate_output(res, max_chars=30_000)
 
 
 async def _search_rg(
