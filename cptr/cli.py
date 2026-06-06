@@ -9,7 +9,12 @@ def cli():
 
 
 @cli.command()
-@click.option("--host", default="0.0.0.0", help="Host to bind to.")
+@click.option(
+    "--host",
+    default="127.0.0.1",
+    show_default=True,
+    help="Host to bind to. Use 0.0.0.0 to allow access from other devices.",
+)
 @click.option("--port", default=8000, type=int, help="Port to bind to.")
 @click.option("--reload", is_flag=True, default=False, help="Enable auto-reload.")
 @click.option("--headless", is_flag=True, default=False, help="Don't open browser.")
