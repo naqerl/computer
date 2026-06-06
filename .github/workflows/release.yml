@@ -1,71 +1,20 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Release — Create GitHub release from CHANGELOG, trigger Docker builds
-# Runs only when main is merged into the release branch and pyproject.toml
-# version changes.
+# Runs on pushes to the release branch when version changes.
 # ─────────────────────────────────────────────────────────────────────────────
 name: Release
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [release]
 
 concurrency:
-  group: release-${{ github.event.pull_request.base.ref || github.ref }}
+  group: release-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  # ── Detect version bump in pyproject.toml ─────────────────────────────────
-  detect-version-change:
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'main'
-    runs-on: ubuntu-latest
-    outputs:
-      version_changed: ${{ steps.check.outputs.changed }}
-      version: ${{ steps.check.outputs.version }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Check for version bump
-        id: check
-        run: |
-          CURRENT=$(python3 -c "
-          import re, pathlib
-          text = pathlib.Path('pyproject.toml').read_text()
-          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
-          print(m.group(1))
-          ")
-
-          git show HEAD~1:pyproject.toml > /tmp/prev_pyproject.toml 2>/dev/null || true
-          if [ -f /tmp/prev_pyproject.toml ]; then
-            PREVIOUS=$(python3 -c "
-          import re, pathlib
-          text = pathlib.Path('/tmp/prev_pyproject.toml').read_text()
-          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
-          print(m.group(1) if m else '')
-          ")
-          else
-            PREVIOUS=""
-          fi
-
-          echo "current=$CURRENT"
-          echo "previous=$PREVIOUS"
-
-          if [ "$CURRENT" != "$PREVIOUS" ] && [ -n "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
-            echo "Version changed: $PREVIOUS -> $CURRENT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No version change detected"
-          fi
-
   # ── Create release and trigger downstream workflows ──────────────────────
   publish:
-    needs: detect-version-change
-    if: needs.detect-version-change.outputs.version_changed == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -74,9 +23,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Read version
+        id: pkg
+        run: |
+          VERSION=$(python3 -c "
+          import re, pathlib
+          text = pathlib.Path('pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
+          print(m.group(1))
+          ")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
       - name: Extract release notes from CHANGELOG
         run: |
-          VER="${{ needs.detect-version-change.outputs.version }}"
+          VER="${{ steps.pkg.outputs.version }}"
           awk "/^## \[${VER}\]/{found=1; next} /^## \[/{if(found) exit} found{print}" \
             CHANGELOG.md > /tmp/release-notes.md
 
@@ -84,21 +44,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if gh release view "v${{ needs.detect-version-change.outputs.version }}" &>/dev/null; then
-            echo "Release v${{ needs.detect-version-change.outputs.version }} already exists — skipping creation"
+          if gh release view "v${{ steps.pkg.outputs.version }}" &>/dev/null; then
+            echo "Release v${{ steps.pkg.outputs.version }} already exists — skipping creation"
           else
-            gh release create "v${{ needs.detect-version-change.outputs.version }}" \
-              --title "v${{ needs.detect-version-change.outputs.version }}" \
+            gh release create "v${{ steps.pkg.outputs.version }}" \
+              --title "v${{ steps.pkg.outputs.version }}" \
               --notes-file /tmp/release-notes.md
           fi
-
-      - name: Trigger Docker build
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.actions.createWorkflowDispatch({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              workflow_id: 'docker.yml',
-              ref: 'release',
-            })

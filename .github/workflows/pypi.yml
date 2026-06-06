@@ -1,71 +1,47 @@
 name: Publish to PyPI
 
 on:
-  pull_request:
-    types: [closed]
+  push:
     branches: [release]
+
+concurrency:
+  group: pypi-${{ github.ref }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
 
 jobs:
-  detect-version-change:
-    if: github.event.pull_request.merged == true && github.event.pull_request.head.ref == 'main'
-    runs-on: ubuntu-latest
-    outputs:
-      version_changed: ${{ steps.check.outputs.changed }}
-      version: ${{ steps.check.outputs.version }}
-    steps:
-      - name: Checkout current commit
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 2           # need parent to diff against
-
-      - name: Check for version bump
-        id: check
-        run: |
-          # Extract version from current commit
-          CURRENT=$(python3 -c "
-          import re, pathlib
-          text = pathlib.Path('pyproject.toml').read_text()
-          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
-          print(m.group(1))
-          ")
-
-          # Extract version from previous commit
-          git show HEAD~1:pyproject.toml > /tmp/prev_pyproject.toml 2>/dev/null || true
-          if [ -f /tmp/prev_pyproject.toml ]; then
-            PREVIOUS=$(python3 -c "
-          import re, pathlib
-          text = pathlib.Path('/tmp/prev_pyproject.toml').read_text()
-          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
-          print(m.group(1) if m else '')
-          ")
-          else
-            PREVIOUS=""
-          fi
-
-          echo "current=$CURRENT"
-          echo "previous=$PREVIOUS"
-
-          if [ "$CURRENT" != "$PREVIOUS" ] && [ -n "$CURRENT" ]; then
-            echo "changed=true" >> "$GITHUB_OUTPUT"
-            echo "version=$CURRENT" >> "$GITHUB_OUTPUT"
-            echo "Version changed: $PREVIOUS -> $CURRENT"
-          else
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            echo "No version change detected"
-          fi
-
   build:
-    needs: detect-version-change
-    if: needs.detect-version-change.outputs.version_changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Read version
+        id: pkg
+        run: |
+          VERSION=$(python3 -c "
+          import re, pathlib
+          text = pathlib.Path('pyproject.toml').read_text()
+          m = re.search(r'^version\s*=\s*\"([^\"]+)\"', text, re.M)
+          print(m.group(1))
+          ")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check if version already on PyPI
+        id: check
+        run: |
+          VERSION="${{ steps.pkg.outputs.version }}"
+          if pip index versions cptr 2>/dev/null | grep -q "$VERSION"; then
+            echo "skip=true" >> $GITHUB_OUTPUT
+            echo "Version $VERSION already on PyPI — skipping"
+          else
+            echo "skip=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Set up Node.js
+        if: steps.check.outputs.skip != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -73,34 +49,40 @@ jobs:
           cache-dependency-path: cptr/frontend/package-lock.json
 
       - name: Build frontend
+        if: steps.check.outputs.skip != 'true'
         working-directory: cptr/frontend
         run: |
           npm ci
           npm run build
 
       - name: Set up Python
+        if: steps.check.outputs.skip != 'true'
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
       - name: Install build tools
+        if: steps.check.outputs.skip != 'true'
         run: pip install hatchling build
 
       - name: Build package
+        if: steps.check.outputs.skip != 'true'
         run: python -m build
 
       - name: Upload dist artifacts
+        if: steps.check.outputs.skip != 'true'
         uses: actions/upload-artifact@v4
         with:
           name: dist
           path: dist/
 
   publish:
-    needs: [detect-version-change, build]
+    needs: build
+    if: needs.build.outputs.skip != 'true'
     runs-on: ubuntu-latest
-    environment: pypi                # GitHub environment for deployment protection
+    environment: pypi
     permissions:
-      id-token: write               # required for trusted publishing (OIDC)
+      id-token: write
     steps:
       - name: Download dist artifacts
         uses: actions/download-artifact@v4
