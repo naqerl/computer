@@ -8,10 +8,8 @@ Three layers:
 
 from __future__ import annotations
 
-import json
 import os
 from pathlib import Path
-from typing import List
 
 from fastapi import APIRouter, Request, Query
 from cptr.env import DATA_DIR
@@ -95,9 +93,6 @@ async def put_workspace(request: Request, path: str = Query(...)):
     # Everything else is workspace data (groups, tabs, etc.)
     await Workspace.upsert(user_id, path, name, body)
 
-    # Track in file-based history for welcome page
-    _track_history(path, name)
-
     return {"status": "saved"}
 
 
@@ -109,26 +104,6 @@ async def delete_workspace(request: Request, path: str = Query(...)):
         return {"status": "skipped"}
     await Workspace.delete_by_path(user_id, path)
     return {"status": "deleted"}
-
-
-# ── History tracking ─────────────────────────────────────────────
-
-def _track_history(path: str, name: str) -> None:
-    """Track workspace in file-based history for the welcome page."""
-    history_file = DATA_DIR / "history.json"
-    history: List[dict] = []
-    if history_file.exists():
-        try:
-            history = json.loads(history_file.read_text())
-        except (json.JSONDecodeError, OSError):
-            history = []
-
-    existing_paths = {h["path"] for h in history}
-    if path and path not in existing_paths:
-        history.append({"name": name, "path": path})
-
-    _ensure_dir()
-    history_file.write_text(json.dumps(history, indent=2))
 
 
 # ── Welcome ──────────────────────────────────────────────────────
@@ -329,22 +304,14 @@ async def get_welcome(request: Request):
             suggestions.append({"name": p.name or c, "path": c})
             seen.add(c)
 
-    # Recent workspace history
-    history: List[dict] = []
-    history_file = DATA_DIR / "history.json"
-    if history_file.exists():
-        try:
-            history = json.loads(history_file.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
-
-    # Filter out workspaces that are currently active for this user
+    # Recent workspaces from DB (most recently used first)
     user_id = await _get_user_id(request)
-    active_paths: set = set()
+    recent: list[dict] = []
     if user_id:
-        active_workspaces = await Workspace.get_by_user(user_id)
-        active_paths = {ws.path for ws in active_workspaces}
-    recent = [h for h in history if h.get("path") not in active_paths]
+        workspaces = await Workspace.get_by_user(user_id)
+        # Sort by updated_at descending (most recent first)
+        workspaces.sort(key=lambda ws: ws.updated_at or 0, reverse=True)
+        recent = [{"name": ws.name, "path": ws.path} for ws in workspaces[:10]]
 
     return {
         "hostname": hostname,
@@ -353,5 +320,5 @@ async def get_welcome(request: Request):
         "system": system,
         "processes": processes,
         "suggestions": suggestions,
-        "recent": recent[-10:],
+        "recent": recent,
     }

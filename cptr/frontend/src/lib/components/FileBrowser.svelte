@@ -164,7 +164,7 @@
 			return;
 		}
 
-		// Normal click — clear selection and act
+		// Normal click, clear selection and act
 		selectedPaths = new Set();
 		lastClickedIndex = index;
 		if (entry.type === 'directory') {

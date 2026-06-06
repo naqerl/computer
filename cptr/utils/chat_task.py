@@ -1,4 +1,4 @@
-"""Chat task runner — agentic loop with tool calling.
+"""Chat task runner: agentic loop with tool calling.
 
 Runs as an asyncio.Task. Streams deltas via Socket.IO, persists to DB.
 """
@@ -126,9 +126,9 @@ Go ahead and act directly for:
 
 ### Planning Workflow
 
-**Step 1 — Research.** Use `read_file`, `search_files`, and `list_directory` to understand the relevant code. Do NOT make any edits during this phase.
+**Step 1: Research.** Use `read_file`, `search_files`, and `list_directory` to understand the relevant code. Do NOT make any edits during this phase.
 
-**Step 2 — Propose a Plan.** Write your plan directly in your response using this format:
+**Step 2: Propose a Plan.** Write your plan directly in your response using this format:
 
 ---
 ## Implementation Plan
@@ -136,29 +136,29 @@ Go ahead and act directly for:
 **Goal:** [What we're doing and why]
 
 **Proposed Changes:**
-- `path/to/file.py` — [what changes and why]
-- `path/to/new_file.py` — [NEW] [what this file does]
-- `path/to/old_file.py` — [DELETE] [why]
+- `path/to/file.py`: [what changes and why]
+- `path/to/new_file.py`: [NEW] [what this file does]
+- `path/to/old_file.py`: [DELETE] [why]
 
 **Open Questions:** (if any)
 - [Anything you need the user to clarify]
 
 **Verification:**
-- [How you'll confirm it works — tests, commands, etc.]
+- [How you'll confirm it works: tests, commands, etc.]
 ---
 
-**Step 3 — Wait for Approval.** After presenting the plan, ask the user to review it. Say something like: *"Does this plan look good, or would you like me to adjust anything?"*
+**Step 3: Wait for Approval.** After presenting the plan, ask the user to review it. Say something like: *"Does this plan look good, or would you like me to adjust anything?"*
 
-**Step 4 — Refine.** If the user has feedback, update the plan and present it again. Repeat until they approve.
+**Step 4: Refine.** If the user has feedback, update the plan and present it again. Repeat until they approve.
 
-**Step 5 — Execute.** Only after the user explicitly approves (e.g. "looks good", "go ahead", "approved"), start making changes. Work through the plan methodically.
+**Step 5: Execute.** Only after the user explicitly approves (e.g. "looks good", "go ahead", "approved"), start making changes. Work through the plan methodically.
 
-**Step 6 — Verify.** After completing the changes, verify by reading edited files or running relevant commands. Summarize what you did.
+**Step 6: Verify.** After completing the changes, verify by reading edited files or running relevant commands. Summarize what you did.
 
 ### Critical Rules
 - **NEVER start editing files before the user approves your plan.**
 - If the user's feedback changes the scope significantly, create a revised plan.
-- Keep plans concise — focus on what changes and why, not implementation minutiae.
+- Keep plans concise. Focus on what changes and why, not implementation minutiae.
 - If you're unsure whether a task needs planning, err on the side of planning.
 
 ## Tool Usage Guidelines
@@ -166,14 +166,14 @@ Go ahead and act directly for:
 ### Reading Files
 - Use `read_file` with `start_line`/`end_line` to read specific sections of large files.
 - Don't read entire files when you only need a specific function, class, or section.
-- Output includes line numbers — use them to target edits precisely.
+- Output includes line numbers; use them to target edits precisely.
 
 ### Editing Files
-- **Use `edit_file` to modify existing files** — it replaces a specific text block.
+- **Use `edit_file` to modify existing files.** It replaces a specific text block.
   You only provide the exact text to find (target) and what to replace it with.
 - For creating new files, use `create_file`.
 - For multiple scattered changes in one file, use `multi_edit_file` with a JSON array of edits.
-- **Avoid `write_file` for modifications** — it overwrites the entire file. Only use it for
+- **Avoid `write_file` for modifications.** It overwrites the entire file. Only use it for
   complete file rewrites when truly necessary.
 
 ### Searching
@@ -194,7 +194,7 @@ Go ahead and act directly for:
 - Use `read_url` to fetch specific documentation pages, README files, or API references.
 
 ### General
-- Always explore the codebase before making changes — read relevant files, search for patterns.
+- Always explore the codebase before making changes. Read relevant files, search for patterns.
 - When editing, be precise: provide enough context in the target text to uniquely identify the
   location, but don't include unnecessary surrounding code.
 - Verify your changes by reading the edited file or running relevant commands.
@@ -240,7 +240,7 @@ async def _load_message_history(chat_id: str, message_id: str) -> list[dict]:
 
     result = []
     for m in chain:
-        # Skip in-progress assistant placeholders — but NOT the current
+        # Skip in-progress assistant placeholders, but NOT the current
         # message being continued, which may have accumulated tool call
         # results from prior approval rounds that the LLM needs to see.
         if m.role == "assistant" and not m.done and m.id != message_id:
@@ -342,7 +342,7 @@ async def run_chat_task(
     output_items: list[dict] = list(msg.output or []) if msg else []
     text_buffer = ""  # Accumulates text between tool calls
 
-    logger.info("[task %s] start — existing content=%d chars, output=%d items",
+    logger.info("[task %s] start: existing content=%d chars, output=%d items",
                 message_id[:8], len(content), len(output_items))
 
     def _flush_text():
@@ -350,7 +350,7 @@ async def run_chat_task(
         nonlocal text_buffer
         if not text_buffer:
             return
-        logger.info("[task %s] flush_text — %d chars into message item",
+        logger.info("[task %s] flush_text: %d chars into message item",
                     message_id[:8], len(text_buffer))
         output_items.append({
             "type": "message",
@@ -376,12 +376,20 @@ async def run_chat_task(
             messages.append({"role": "user", "content": regeneration_prompt})
         tools = get_tool_list()
 
-        # Check if user enabled auto-approve for all tools
+        # Load chat params for approval mode
         chat_obj = await Chat.get_by_id(chat_id)
         chat_params = (
             (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
         )
-        auto_approve_all = bool(chat_params.get("auto_approve_tools"))
+
+        # Tool approval mode: 'ask' | 'auto' | 'full'
+        #   ask  = require approval for ALL tools (including reads)
+        #   auto = auto-approve tools marked auto=True, ask for others
+        #   full = auto-approve everything
+        approval_mode = chat_params.get("tool_approval_mode", "auto")
+        # Legacy compat: old boolean auto_approve_tools
+        if "tool_approval_mode" not in chat_params and "auto_approve_tools" in chat_params:
+            approval_mode = "full" if chat_params["auto_approve_tools"] else "auto"
 
         for _iteration in range(CHAT_MAX_ITERATIONS):
             form_data = ChatCompletionForm(
@@ -421,7 +429,13 @@ async def run_chat_task(
                         "arguments": event["arguments"],
                     }
 
-                    if tool and (tool["auto"] or auto_approve_all):
+                    # Decide whether to auto-approve
+                    should_auto = (
+                        approval_mode == "full"
+                        or (approval_mode == "auto" and tool and tool["auto"])
+                    )
+
+                    if should_auto:
                         result = await execute_tool(name, event["arguments"], workspace)
                         item["status"] = "completed"
                         output_items.append(item)
@@ -441,7 +455,7 @@ async def run_chat_task(
                         break
 
                     else:
-                        # Needs approval — persist and stop
+                        # Needs approval, persist and stop
                         item["status"] = "pending"
                         output_items.append(item)
                         await ChatMessage.update(
@@ -457,7 +471,7 @@ async def run_chat_task(
                 elif event["type"] == "usage":
                     _flush_text()
                     usage = {k: v for k, v in event.items() if k != "type"}
-                    logger.info("[task %s] save (usage) — content=%d chars, output=%d items, types=%s",
+                    logger.info("[task %s] save (usage): content=%d chars, output=%d items, types=%s",
                                 message_id[:8], len(content), len(output_items),
                                 [i.get('type') for i in output_items])
                     await ChatMessage.update(
@@ -476,7 +490,7 @@ async def run_chat_task(
 
             if not restart:
                 _flush_text()
-                logger.info("[task %s] save (end) — content=%d chars, output=%d items, types=%s",
+                logger.info("[task %s] save (end): content=%d chars, output=%d items, types=%s",
                             message_id[:8], len(content), len(output_items),
                             [i.get('type') for i in output_items])
                 await ChatMessage.update(

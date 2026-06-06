@@ -97,7 +97,7 @@
 		sidebarOpen.update((v) => !v);
 	}
 
-	// Native drag handlers are NOT needed — Sortable's setData handles it.
+	// Native drag handlers are NOT needed. Sortable's setData handles it.
 	// We keep the native drop handlers on the bar for cross-group drops.
 
 	function handleBarDragOver(e: DragEvent) {

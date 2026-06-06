@@ -1,5 +1,5 @@
 /**
- * Terminal API — create, list, delete sessions.
+ * Terminal API: create, list, delete sessions.
  */
 import { fetchHandler, fetchJSON, jsonBody } from '$lib/apis';
 

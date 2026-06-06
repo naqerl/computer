@@ -1,4 +1,4 @@
-"""Chat file export — regenerate .cptr/chats/{id}.json from DB.
+"""Chat file export: regenerate .cptr/chats/{id}.json from DB.
 
 The JSON file on disk is the portable backup. DB is the primary store.
 This function rebuilds the file from DB state.

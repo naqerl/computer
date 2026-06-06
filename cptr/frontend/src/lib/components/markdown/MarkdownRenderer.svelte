@@ -7,7 +7,7 @@
 	 *
 	 * Parses markdown via marked.lexer() into AST tokens,
 	 * then renders each token as a Svelte component.
-	 * Styled entirely via Tailwind prose — no custom CSS.
+	 * Styled entirely via Tailwind prose. No custom CSS.
 	 */
 
 	import { Lexer } from 'marked';
@@ -41,6 +41,6 @@
 	});
 </script>
 
-<div class="prose prose-sm dark:prose-invert max-w-none break-words prose-p:my-0 prose-headings:my-1 prose-headings:font-semibold prose-strong:font-semibold prose-th:font-semibold prose-code:before:content-none prose-code:after:content-none prose-ul:-my-0 prose-ol:-my-0 prose-li:-my-0 prose-pre:my-0 prose-blockquote:my-0 prose-hr:my-4 prose-img:my-1 prose-table:my-0">
+<div class="prose prose-sm dark:prose-invert max-w-none break-words leading-relaxed prose-p:my-2 prose-p:leading-relaxed prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold prose-headings:leading-snug prose-strong:font-semibold prose-th:font-semibold prose-code:before:content-none prose-code:after:content-none prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-3 prose-blockquote:my-3 prose-hr:my-4 prose-img:my-2 prose-table:my-3 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
 	<BlockRenderer {tokens} />
 </div>

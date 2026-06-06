@@ -9,7 +9,7 @@
 
 	import ModelSelector from './ModelSelector.svelte';
 	import SendButton from './SendButton.svelte';
-	import AttachButton from './AttachButton.svelte';
+	import PlusMenu from './PlusMenu.svelte';
 	import DictateButton from './DictateButton.svelte';
 
 	interface Props {
@@ -134,14 +134,14 @@
 			></div>
 		</div>
 
-		<!-- Toolbar — stopPropagation prevents TipTap from stealing focus -->
+		<!-- Toolbar. stopPropagation prevents TipTap from stealing focus -->
 		<!-- svelte-ignore a11y_no_static_element_interactions -->
 		<div
 			class="flex items-center justify-between mt-0.5 mb-2.5 mx-0.5"
 			onmousedown={(e) => e.stopPropagation()}
 		>
 			<div class="ml-0.5 self-end flex items-center">
-				<AttachButton onfiles={(files) => { /* TODO: handle file uploads */ }} />
+				<PlusMenu onfiles={(files) => { /* TODO: handle file uploads */ }} />
 			</div>
 			<div class="self-end mr-1 flex items-center gap-2">
 				<ModelSelector bind:selectedModel />

@@ -99,7 +99,7 @@
 					class: 'rte-prosemirror',
 					spellcheck: 'true',
 				},
-				// Handle image drops — upload to same directory as .md file
+				// Handle image drops: upload to same directory as .md file
 				handleDrop: (view, event, _slice, moved) => {
 					if (moved || !event.dataTransfer?.files?.length) return false;
 
@@ -139,7 +139,7 @@
 		};
 		editorEl.addEventListener('keydown', handleKeydown);
 
-		// Theme observer — update editor class on theme change
+		// Theme observer: update editor class on theme change
 		themeObserver = new MutationObserver(() => {
 			if (editorEl) {
 				editorEl.closest('.rte-container')?.classList.toggle('dark-mode', isDarkMode());
@@ -171,7 +171,7 @@
 		}
 	}
 
-	// Public API — @tiptap/markdown augments Editor with getMarkdown()
+	// Public API: @tiptap/markdown augments Editor with getMarkdown()
 	export function getMarkdown(): string {
 		if (!editor) return content;
 		return (editor as any).getMarkdown();

@@ -24,7 +24,7 @@ def now_ms() -> int:
 
 
 class AuthMode(str, Enum):
-    PASSWORD = "password"               # Default — single user with password
+    PASSWORD = "password"               # Default: single user with password
     PAM = "pam"                         # Linux system users
     TRUSTED_HEADER = "trusted_header"   # Reverse proxy / platform gateway
 
@@ -200,7 +200,7 @@ async def get_or_create_user(username: str) -> str:
             await db.commit()
             return user.id
         else:
-            # Update last_seen directly — avoid lazy load on auth.user
+            # Update last_seen directly to avoid lazy load on auth.user
             await db.execute(
                 update(User).where(User.id == auth.user_id).values(last_seen_at=now_ms())
             )

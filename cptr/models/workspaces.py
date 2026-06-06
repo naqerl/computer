@@ -1,4 +1,4 @@
-"""Workspace model — one row per user+path, stores tabs/groups/layout."""
+"""Workspace model: one row per user+path, stores tabs/groups/layout."""
 
 from __future__ import annotations
 

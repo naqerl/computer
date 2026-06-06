@@ -23,11 +23,6 @@
 			boundsPadding: 0.1,
 			zoomSpeed: 0.065,
 			smoothScroll: false,
-			beforeWheel(e) {
-				// Only zoom on pinch (ctrl/meta); let normal scroll pass through
-				if (!e.ctrlKey && !e.metaKey) return true;
-				return false;
-			},
 			beforeMouseDown() {
 				// Only drag-to-pan when zoomed in
 				const transform = pzInstance?.getTransform();

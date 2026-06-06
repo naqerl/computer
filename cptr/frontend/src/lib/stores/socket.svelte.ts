@@ -1,5 +1,5 @@
 /**
- * Shared Socket.IO connection — singleton managed by layout.
+ * Shared Socket.IO connection: singleton managed by layout.
  *
  * Any store (chat, future features) registers listeners on this.
  * Layout calls connect() on mount, disconnect() on destroy.

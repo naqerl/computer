@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { getChat, getChats, deleteChat as apiDeleteChat, sendMessage as apiSendMessage, approveToolCall, cancelTask, updateCurrentMessage, updateMessage, createMessage, type ChatMessageRow, type ChatInfo } from '$lib/apis/chat';
-	import { chatModels, defaultModel, streamingChatTabs } from '$lib/stores/chat';
+	import { chatModels, defaultModel, streamingChatTabs, registerStreamingChat, unregisterStreamingChat } from '$lib/stores/chat';
 	import { socketStore } from '$lib/stores/socket.svelte';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { get } from 'svelte/store';
-	import { currentWorkspace, autoApproveTools } from '$lib/stores';
+	import { currentWorkspace, toolApprovalMode } from '$lib/stores';
 
 	import ChatInput from './ChatInput.svelte';
 	import UserMessage from './UserMessage.svelte';
@@ -28,6 +28,22 @@
 	let chatInputEl: ChatInput;
 	let sending = $state(false);
 	let autoScroll = $state(true);
+	let loading = $state(!!initialChatId);
+
+	// ── Windowed rendering ──────────────────────────────────────
+	// Only render the last N turns to keep the DOM light for long chats.
+	// A "turn" is a user+assistant message pair, so 6 turns = 12 messages.
+
+	const TURNS_PER_PAGE = 6;
+	const MESSAGES_PER_PAGE = TURNS_PER_PAGE * 2; // user + assistant
+	let visibleCount = $state(MESSAGES_PER_PAGE);
+
+	// Reset visible window when chat changes
+	$effect(() => {
+		if (chatId) {
+			visibleCount = MESSAGES_PER_PAGE;
+		}
+	});
 
 	// ── Tree-aware path computation ─────────────────────────────
 
@@ -62,7 +78,7 @@
 		const msgMap = new Map(allMessages.map((m) => [m.id, m]));
 		const childrenMap = buildChildrenMap(allMessages);
 
-		// Determine effective currentId — fall back to last message if unset
+		// Determine effective currentId: fall back to last message if unset
 		const effectiveId = currentMessageId && msgMap.has(currentMessageId)
 			? currentMessageId
 			: allMessages.length > 0 ? allMessages[allMessages.length - 1].id : null;
@@ -96,6 +112,28 @@
 		return path;
 	});
 
+	// ── Visible slice of the active path ────────────────────────
+	const hasHiddenMessages = $derived(activePath.length > visibleCount);
+	const visiblePath = $derived(
+		hasHiddenMessages ? activePath.slice(activePath.length - visibleCount) : activePath
+	);
+
+	function loadMoreMessages() {
+		if (!messagesEl) return;
+		// Remember scroll height before loading more so we can maintain position
+		const prevScrollHeight = messagesEl.scrollHeight;
+
+		visibleCount = Math.min(visibleCount + MESSAGES_PER_PAGE, activePath.length);
+
+		// After DOM updates, restore scroll position so the view doesn't jump
+		tick().then(() => {
+			if (messagesEl) {
+				const newScrollHeight = messagesEl.scrollHeight;
+				messagesEl.scrollTop += newScrollHeight - prevScrollHeight;
+			}
+		});
+	}
+
 	const streaming = $derived(allMessages.some((m) => m.role === 'assistant' && !m.done));
 	const isLanding = $derived(allMessages.length === 0 && !chatId);
 	const workspaceName = $derived(workspace.split('/').pop() || 'workspace');
@@ -104,9 +142,14 @@
 
 	async function loadChat(id: string) {
 		chatId = id;
-		const data = await getChat(id);
-		allMessages = data.messages;
-		currentMessageId = data.chat.current_message_id;
+		loading = true;
+		try {
+			const data = await getChat(id);
+			allMessages = data.messages;
+			currentMessageId = data.chat.current_message_id;
+		} finally {
+			loading = false;
+		}
 	}
 
 	async function loadPreviousChats() {
@@ -168,6 +211,10 @@
 			allMessages = [...allMessages];
 		}
 		if (data.done) {
+			// Clear streaming indicator for this tab
+			if (tabId) {
+				streamingChatTabs.update((s) => { const n = new Set(s); n.delete(tabId); return n; });
+			}
 			loadChat(data.chat_id);
 		}
 	}
@@ -207,10 +254,9 @@
 			socket.off('events:chat', handleSocketEvent);
 			socket.off('connect', handleReconnect);
 		}
-		// Clean up streaming indicator for this tab
-		if (tabId) {
-			streamingChatTabs.update((s) => { s.delete(tabId); return new Set(s); });
-		}
+		// Don't clear streamingChatTabs here -- the global listener in
+		// chat.ts handles cleanup when the "done" event arrives, so the
+		// spinner persists even when the chat tab is not active.
 	});
 
 	// ── Persist model selection ─────────────────────────────────
@@ -231,6 +277,14 @@
 		});
 	});
 
+	// ── Register chatId→tabId mapping for global done listener ─
+
+	$effect(() => {
+		if (!chatId || !tabId) return;
+		registerStreamingChat(chatId, tabId);
+		return () => unregisterStreamingChat(chatId!);
+	});
+
 	// ── Auto-scroll ─────────────────────────────────────────────
 
 	function scrollToBottom() {
@@ -244,10 +298,21 @@
 		});
 	}
 
+	let lastScrollTop = 0;
+
 	function handleMessagesScroll() {
 		if (!messagesEl) return;
-		autoScroll =
-			messagesEl.scrollHeight - messagesEl.scrollTop <= messagesEl.clientHeight + 50;
+		const { scrollTop, scrollHeight, clientHeight } = messagesEl;
+
+		// If the user scrolled upward, immediately disengage auto-scroll
+		if (scrollTop < lastScrollTop) {
+			autoScroll = false;
+		} else {
+			// Re-engage only when very close to the bottom
+			autoScroll = scrollHeight - scrollTop <= clientHeight + 200;
+		}
+
+		lastScrollTop = scrollTop;
 	}
 
 	$effect(() => {
@@ -297,7 +362,8 @@
 		}
 
 		try {
-			const result = await apiSendMessage(text, selectedModel, workspace, chatId ?? undefined, parentId, { auto_approve_tools: get(autoApproveTools) });
+			const mode = get(toolApprovalMode);
+			const result = await apiSendMessage(text, selectedModel, workspace, chatId ?? undefined, parentId, { tool_approval_mode: mode });
 			await loadChat(result.chat_id);
 			if (isNew && tabId) {
 				updateTab(tabId, result.chat_id, text.slice(0, 40) || 'Chat');
@@ -355,7 +421,7 @@
 
 		approveToolCall(chatId, messageId, callId, approved).catch((err) => {
 			console.error('[chat] approve error', err);
-			// Revert on failure — reload from DB to get true state
+			// Revert on failure: reload from DB to get true state
 			loadChat(chatId!);
 		});
 	}
@@ -380,7 +446,8 @@
 		if (!msg?.parent_id || !chatId || !selectedModel) return;
 
 		try {
-			const result = await apiSendMessage('', selectedModel, workspace, chatId, msg.parent_id, { auto_approve_tools: get(autoApproveTools) });
+			const mode = get(toolApprovalMode);
+			const result = await apiSendMessage('', selectedModel, workspace, chatId, msg.parent_id, { tool_approval_mode: mode });
 			await loadChat(result.chat_id);
 		} catch (e) {
 			console.error('[chat] regenerate error', e);
@@ -411,7 +478,7 @@
 		}
 
 		if (msg.role === 'user') {
-			// Send — create new sibling user message + trigger LLM
+			// Send: create new sibling user message + trigger LLM
 			try {
 				const result = await apiSendMessage(
 					content,
@@ -419,14 +486,14 @@
 					workspace,
 					chatId,
 					msg.parent_id,
-					{ auto_approve_tools: get(autoApproveTools) }
+					{ tool_approval_mode: get(toolApprovalMode) }
 				);
 				await loadChat(result.chat_id);
 			} catch (e) {
 				console.error('[chat] edit-send error', e);
 			}
 		} else {
-			// Save As Copy — create new sibling assistant message (no LLM)
+			// Save As Copy: create new sibling assistant message (no LLM)
 			try {
 				await createMessage(chatId, msg.parent_id ?? null, 'assistant', content, output ?? undefined);
 				await loadChat(chatId);
@@ -454,7 +521,7 @@
 
 <div class="flex flex-col h-full bg-white dark:bg-black">
 	{#if isLanding}
-		<!-- Landing — input + recent chats -->
+		<!-- Landing: input + recent chats -->
 		<div class="flex-1 overflow-y-auto">
 			<div class="max-w-xl mx-auto px-4 flex flex-col" style="padding-top: max(14vh, 48px);">
 				<!-- Greeting -->
@@ -477,9 +544,28 @@
 		</div>
 	{:else}
 		<!-- Conversation view -->
+		{#if loading}
+			<div class="flex-1 flex items-center justify-center text-gray-400 dark:text-gray-500">
+				<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+					<style>.chat-load-spin{transform-origin:center;animation:chat-load-spin .75s infinite linear}@keyframes chat-load-spin{100%{transform:rotate(360deg)}}</style>
+					<circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="2" opacity="0.15" />
+					<path d="M10.14,1.16a11,11,0,0,0-9,8.92A1.59,1.59,0,0,0,2.46,12,1.52,1.52,0,0,0,4.11,10.7a8,8,0,0,1,6.66-6.61A1.42,1.42,0,0,0,12,2.69h0A1.57,1.57,0,0,0,10.14,1.16Z" fill="currentColor" class="chat-load-spin" />
+				</svg>
+			</div>
+		{:else}
 		<div bind:this={messagesEl} class="flex-1 overflow-y-auto" onscroll={handleMessagesScroll}>
 			<div class="max-w-2xl mx-auto px-4 pt-4 pb-16 flex flex-col gap-4">
-				{#each activePath as { msg, siblingIds, siblingIndex } (msg.id)}
+				{#if hasHiddenMessages}
+					<div class="flex justify-center py-2">
+						<button
+							class="text-xs text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300 transition-colors px-3 py-1.5 rounded-full border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 bg-gray-50 dark:bg-gray-800/50"
+							onclick={loadMoreMessages}
+						>
+							Load earlier messages ({activePath.length - visibleCount} hidden)
+						</button>
+					</div>
+				{/if}
+				{#each visiblePath as { msg, siblingIds, siblingIndex } (msg.id)}
 					{#if msg.role === 'user'}
 						<UserMessage
 							content={msg.content}
@@ -506,6 +592,7 @@
 				{/each}
 			</div>
 		</div>
+		{/if}
 
 		<!-- Input area -->
 		<div class="px-4 py-3">

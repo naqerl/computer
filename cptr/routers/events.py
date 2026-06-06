@@ -1,4 +1,4 @@
-"""Unified system events WebSocket — fs watching + port scanning.
+"""Unified system events WebSocket: fs watching + port scanning.
 
 Replaces the old watch.py with a single multiplexed event stream.
 """
@@ -257,7 +257,7 @@ def _scan_ports() -> list[dict]:
     elif system == "Linux":
         raw = _scan_ports_linux()
     else:
-        # Windows fallback — not implemented yet
+        # Windows fallback, not implemented yet
         return []
 
     # Get our own PID to filter ourselves out
@@ -280,7 +280,7 @@ def _scan_ports() -> list[dict]:
         if entry["process"] in _IGNORED_PROCESSES:
             continue
 
-        # Session attribution — only include ports spawned by our terminals
+        # Session attribution: only include ports spawned by our terminals
         if entry["pid"]:
             session_id = _find_session_for_pid(entry["pid"])
             if session_id:
@@ -360,7 +360,7 @@ async def events_ws(websocket: WebSocket, path: str = Query("/", description="In
       - {"type": "port_removed", "port": N}
 
     Receives:
-      - {"type": "watch_path", "path": "..."} — change fs watch directory
+      - {"type": "watch_path", "path": "..."}: change fs watch directory
     """
     target = Path(path).resolve()
     if not target.is_dir():

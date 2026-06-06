@@ -34,7 +34,7 @@ class LocalStorage(StorageBackend):
         self._dir.mkdir(parents=True, exist_ok=True)
 
     def _path(self, key: str) -> Path:
-        # Keys are UUIDs — no path traversal risk
+        # Keys are UUIDs, no path traversal risk
         return self._dir / key
 
     async def put(self, key: str, data: bytes) -> None:

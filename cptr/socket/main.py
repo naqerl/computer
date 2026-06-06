@@ -1,4 +1,4 @@
-"""Socket.IO server — creates the sio instance and registers all handlers.
+"""Socket.IO server: creates the sio instance and registers all handlers.
 
 Usage in app.py:
     from cptr.socket.main import sio_app

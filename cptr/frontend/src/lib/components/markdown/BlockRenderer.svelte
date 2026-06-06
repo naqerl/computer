@@ -88,7 +88,7 @@
 		<!-- Skip raw HTML for safety -->
 
 	{:else if token.type === 'def'}
-		<!-- Link reference definition — no visual output -->
+		<!-- Link reference definition, no visual output -->
 
 	{:else if token.type === 'space'}
 		<!-- skip -->

@@ -20,7 +20,7 @@
 	import { EditorState } from '@codemirror/state';
 	import { EditorView, keymap, lineNumbers, highlightActiveLineGutter, highlightSpecialChars, drawSelection, highlightActiveLine, rectangularSelection } from '@codemirror/view';
 	import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-	import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap } from '@codemirror/language';
+	import { syntaxHighlighting, defaultHighlightStyle, indentOnInput, bracketMatching, foldGutter, foldKeymap, StreamLanguage } from '@codemirror/language';
 	import { closeBrackets, closeBracketsKeymap } from '@codemirror/autocomplete';
 	import { searchKeymap, highlightSelectionMatches } from '@codemirror/search';
 	import { oneDark } from '@codemirror/theme-one-dark';
@@ -37,6 +37,7 @@
 	import { sql } from '@codemirror/lang-sql';
 	import { xml } from '@codemirror/lang-xml';
 	import { yaml } from '@codemirror/lang-yaml';
+	import { shell } from '@codemirror/legacy-modes/mode/shell';
 
 	interface Props {
 		filePath: string;
@@ -103,7 +104,7 @@
 	type MarkdownMode = 'preview' | 'editor' | 'raw';
 	let markdownMode = $state<MarkdownMode>('preview');
 
-	// Rich text editor — lazy loaded
+	// Rich text editor, lazy loaded
 	let RichTextEditor: typeof RichTextEditorType | null = $state(null);
 	let richTextRef: { getMarkdown: () => string; getEditor: () => any } | undefined = $state();
 
@@ -174,7 +175,7 @@
 		return ' ';
 	}
 
-	// Editing state — true when the code editor should be active
+	// Editing state: true when the code editor should be active
 	let isEditing = $derived(
 		fileData && !fileData.binary && !isBinaryPreview && !isCsv && (
 			isMarkdown ? markdownMode === 'raw' :
@@ -203,6 +204,7 @@
 			case 'sql': return sql();
 			case 'xml': return xml();
 			case 'yaml': return yaml();
+			case 'bash': case 'shell': case 'sh': case 'zsh': return StreamLanguage.define(shell);
 			default: return [];
 		}
 	}
@@ -286,7 +288,7 @@
 					} else if (isCsv) {
 						// Handled by its component, no editor needed
 					} else if (isSvg || isHtml) {
-						// Start in preview mode — editor created on toggle
+						// Start in preview mode, editor created on toggle
 						previewMode = true;
 					} else {
 						requestAnimationFrame(() => initEditor(fileData!.content!, fileData!.language));
@@ -709,10 +711,10 @@
 			{/if}
 
 		{:else if fileData?.binary}
-			<!-- Unknown binary — fallback -->
+			<!-- Unknown binary, fallback -->
 			<div class="state">
 				<p class="state-title">Binary file</p>
-				<p class="state-sub">{fileData.name} — {formatSize(fileData.size)}</p>
+				<p class="state-sub">{fileData.name} ({formatSize(fileData.size)})</p>
 			</div>
 
 		{:else if diffMode}
@@ -827,6 +829,22 @@
 		border-radius: 4px;
 		color: var(--color-gray-400);
 		transition: all 0.1s;
+	}
+
+	@media (max-width: 768px) {
+		.toolbar-btn {
+			width: 32px;
+			height: 32px;
+			border-radius: 6px;
+		}
+
+		.toolbar {
+			height: 38px;
+		}
+
+		.toolbar-right {
+			gap: 4px;
+		}
 	}
 
 	.toolbar-btn:hover {

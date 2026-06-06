@@ -62,7 +62,7 @@
 		if (rect.width === 0 || rect.height === 0) return;
 		try {
 			fitAddon.fit();
-			// Do NOT scroll after fit — rich CLI apps (htop, vim, Claude Code)
+			// Do NOT scroll after fit. Rich CLI apps (htop, vim, Claude Code)
 			// manage their own cursor/viewport after SIGWINCH. Forcing scroll
 			// interferes with their rendering.
 		} catch {
@@ -72,7 +72,7 @@
 
 	function debouncedFit() {
 		if (resizeTimeout) clearTimeout(resizeTimeout);
-		// 350ms debounce — long enough to outlast the mobile keyboard
+		// 350ms debounce, long enough to outlast the mobile keyboard
 		// animation so we only refit ONCE after it fully settles.
 		resizeTimeout = setTimeout(() => doFit(), 350);
 	}
@@ -98,13 +98,13 @@
 	};
 
 	// Send input to PTY via WebSocket (binary prefix protocol).
-	// Writes directly into the pre-allocated buffer — zero allocation
+	// Writes directly into the pre-allocated buffer. Zero allocation
 	// for the common single-ASCII-keystroke path.
 	function sendInput(data: string) {
 		if (ws?.readyState !== WebSocket.OPEN) return;
 
 		if (data.length === 1 && data.charCodeAt(0) < 128) {
-			// Fast path: single ASCII byte — no TextEncoder, no allocation
+			// Fast path: single ASCII byte, no TextEncoder, no allocation
 			if (1 + inputBufLen + 1 > INPUT_BUF_CAP) flushInput();
 			inputBuf[1 + inputBufLen++] = data.charCodeAt(0);
 		} else {
@@ -120,7 +120,7 @@
 		}
 	}
 
-	// Pre-allocated 5-byte resize buffer — reused on every resize event
+	// Pre-allocated 5-byte resize buffer, reused on every resize event
 	const resizeBuf = new ArrayBuffer(5);
 	const resizeView = new DataView(resizeBuf);
 	resizeView.setUint8(0, MSG_RESIZE);
@@ -193,7 +193,7 @@
 		term.loadAddon(fitAddon);
 		term.open(containerEl);
 
-		// GPU-accelerated rendering — 2-5x faster than canvas 2D.
+		// GPU-accelerated rendering, 2-5x faster than canvas 2D.
 		// Falls back to canvas if WebGL is unavailable.
 		try {
 			const webgl = new WebglAddon();
@@ -203,7 +203,7 @@
 			// WebGL not supported, canvas fallback is fine
 		}
 
-		// Register input/resize handlers ONCE — not per WebSocket connection.
+		// Register input/resize handlers ONCE, not per WebSocket connection.
 		// This prevents duplicate SIGWINCH signals that cause rich CLI apps
 		// (e.g. Claude Code, htop) to render content twice.
 		term.onData((data: string) => {
@@ -211,7 +211,7 @@
 		});
 
 		term.onResize(({ cols, rows }: { cols: number; rows: number }) => {
-			// Skip if dimensions haven't actually changed — prevents duplicate
+			// Skip if dimensions haven't actually changed. Prevents duplicate
 			// SIGWINCH when keyboard open/close triggers multiple fit cycles.
 			if (cols === lastSentCols && rows === lastSentRows) return;
 			lastSentCols = cols;
@@ -265,14 +265,14 @@
 			const lines = Math.trunc(touchAccum / LINE_PX);
 			if (lines !== 0) {
 				if (isAltBuffer()) {
-					// TUI apps (vim, htop, Claude Code) — send arrow keys
+					// TUI apps (vim, htop, Claude Code): send arrow keys
 					const seq = lines > 0 ? '\x1b[B' : '\x1b[A';
 					const count = Math.abs(lines);
 					for (let i = 0; i < Math.min(count, 5); i++) {
 						sendInput(seq);
 					}
 				} else {
-					// Normal buffer — scroll terminal history
+					// Normal buffer: scroll terminal history
 					term.scrollLines(lines);
 				}
 				touchAccum -= lines * LINE_PX;
@@ -289,13 +289,13 @@
 		document.addEventListener('touchmove', onTouchMove, { passive: false });
 		document.addEventListener('touchend', onTouchEnd, { passive: true });
 
-		// Initial fit — deferred to let the container settle in the DOM
+		// Initial fit, deferred to let the container settle in the DOM
 		requestAnimationFrame(() => {
 			doFit();
 		});
 
 		// ResizeObserver is the SOLE trigger for refitting on container
-		// size changes. No other resize listener needed — the layout
+		// size changes. No other resize listener needed; the layout
 		// already handles visualViewport → container height propagation.
 		resizeObserver = new ResizeObserver(() => {
 			debouncedFit();
@@ -329,7 +329,7 @@
 			console.log(`[terminal] WebSocket open for ${sessionId}`);
 			if (term) {
 				// Send ONE resize message with current dimensions.
-				// Do NOT call doFit() here — that would trigger term.onResize
+				// Do NOT call doFit() here; that would trigger term.onResize
 				// which sends a SECOND resize message, causing rich CLI apps
 				// to receive double SIGWINCH and render content twice.
 				lastSentCols = term.cols;
@@ -340,7 +340,7 @@
 		};
 
 		ws.onmessage = (event) => {
-			// binaryType='arraybuffer' guarantees ArrayBuffer — write
+			// binaryType='arraybuffer' guarantees ArrayBuffer; write
 			// directly with a Uint8Array view (zero-copy wrapper)
 			term?.write(new Uint8Array(event.data as ArrayBuffer));
 		};

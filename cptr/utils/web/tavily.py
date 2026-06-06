@@ -1,6 +1,6 @@
-"""Tavily search provider — purpose-built for AI agents.
+"""Tavily search provider: purpose-built for AI agents.
 
-https://tavily.com — Provides AI-optimized search with optional
+https://tavily.com. Provides AI-optimized search with optional
 answer synthesis across results.
 """
 

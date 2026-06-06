@@ -40,7 +40,7 @@ async def auth_middleware(request: Request, call_next):
         return await call_next(request)
     if path.startswith("/_app/") or not path.startswith("/api/"):
         return await call_next(request)
-    # GET /api/files/{id} is public — UUID is unguessable, <img src> can't send cookies
+    # GET /api/files/{id} is public (UUID is unguessable, <img src> can't send cookies)
     if request.method == "GET" and path.startswith("/api/files/"):
         return await call_next(request)
 
@@ -125,7 +125,7 @@ if FRONTEND_BUILD_DIR.exists():
         return FileResponse(FRONTEND_BUILD_DIR / "index.html")
 
 
-# Socket.IO — wraps the entire ASGI app
+# Socket.IO: wraps the entire ASGI app
 from cptr.socket.main import get_asgi_app
 
 application = get_asgi_app(app)

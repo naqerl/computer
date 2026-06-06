@@ -1,5 +1,5 @@
 /**
- * Chat API — send messages, approve/reject tools, cancel tasks, fetch chats.
+ * Chat API: send messages, approve/reject tools, cancel tasks, fetch chats.
  */
 import { fetchJSON, jsonBody } from '$lib/apis';
 
@@ -56,7 +56,7 @@ export const sendMessage = (
 	workspace: string,
 	chatId?: string,
 	parentId?: string | null,
-	params: { auto_approve_tools?: boolean } = {},
+	params: { tool_approval_mode?: string } = {},
 	regenerationPrompt?: string
 ) =>
 	fetchJSON<SendMessageResult>(

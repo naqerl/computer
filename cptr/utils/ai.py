@@ -1,4 +1,4 @@
-"""Provider streaming functions — raw httpx SSE.
+"""Provider streaming functions: raw httpx SSE.
 
 Each function takes a ChatCompletionForm + url + key.
 All yield normalized events: text_delta, tool_call, usage, done.

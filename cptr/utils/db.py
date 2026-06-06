@@ -40,7 +40,7 @@ async def init_db():
     async with get_engine().begin() as conn:
         await conn.exec_driver_sql("PRAGMA journal_mode=WAL")
 
-    # Run Alembic migrations (sync — one-time startup cost)
+    # Run Alembic migrations (sync, one-time startup cost)
     from alembic import command
     from alembic.config import Config
 

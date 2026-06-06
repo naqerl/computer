@@ -1,6 +1,6 @@
 """Brave Search provider.
 
-https://brave.com/search/api/ — Free tier: 2000 queries/month.
+https://brave.com/search/api/. Free tier: 2000 queries/month.
 """
 
 from __future__ import annotations

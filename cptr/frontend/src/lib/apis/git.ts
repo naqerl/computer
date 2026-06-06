@@ -1,5 +1,5 @@
 /**
- * Git API — status, log, diff, stage, commit, push, pull, branches.
+ * Git API: status, log, diff, stage, commit, push, pull, branches.
  */
 import { fetchJSON, jsonBody } from '$lib/apis';
 

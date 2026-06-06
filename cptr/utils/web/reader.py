@@ -1,4 +1,4 @@
-"""URL content reader — fetch and convert to text.
+"""URL content reader: fetch and convert to text.
 
 No external dependencies beyond httpx (already in the project).
 """

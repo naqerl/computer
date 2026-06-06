@@ -1,7 +1,7 @@
 /**
  * Session management: user state + 401 handling.
  *
- * No client-side expiry timers — the server is the source of truth.
+ * No client-side expiry timers; the server is the source of truth.
  * If any API call returns 401, we clear the session and reload.
  */
 

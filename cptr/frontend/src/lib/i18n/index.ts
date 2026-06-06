@@ -75,7 +75,7 @@ i18next.on('languageChanged', (lng: string) => {
 	_tick.update((n) => n + 1);
 });
 
-/** Reactive translation function — use as `$t('key')` or `$t('key', { count: 3 })` in templates. */
+/** Reactive translation function: use as `$t('key')` or `$t('key', { count: 3 })` in templates. */
 export const t = derived(_tick, () => i18next.t.bind(i18next) as TFunction);
 
 /** Change the active locale. */

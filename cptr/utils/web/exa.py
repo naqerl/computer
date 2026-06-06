@@ -1,6 +1,7 @@
-"""Exa search provider — neural search purpose-built for AI.
+"""Exa search provider: neural search purpose-built for AI.
 
-https://exa.ai — Uses the /search + /contents endpoints for
+https://exa.ai
+Uses the /search + /contents endpoints for
 high-quality results with full page content extraction.
 """
 
@@ -13,7 +14,7 @@ async def search(query: str, api_key: str, count: int = 5) -> str:
     """Search using Exa's neural search API.
 
     Exa returns semantically relevant results with optional full-text
-    content extraction — ideal for AI tool use since the model gets
+    content extraction, ideal for AI tool use since the model gets
     actual page content, not just snippets.
     """
     async with httpx.AsyncClient(timeout=15) as client:

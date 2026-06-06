@@ -1,4 +1,4 @@
-"""Web tools package — search and URL reading for the AI agent.
+"""Web tools package: search and URL reading for the AI agent.
 
 Exposes `web_search_handler` and `read_url_handler` consumed by tools.py.
 """

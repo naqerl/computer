@@ -2,17 +2,17 @@
  * Workspace + Tab state management for cptr.
  *
  * State is split into three layers:
- *   1. Browser-tab state: which workspace is active — determined by URL (?workspace=...)
- *   2. Workspace state: tabs, groups, split layout — persisted server-side per workspace path
- *   3. User preferences: theme, locale, sidebar — persisted server-side globally
+ *   1. Browser-tab state: which workspace is active, determined by URL (?workspace=...)
+ *   2. Workspace state: tabs, groups, split layout, persisted server-side per workspace path
+ *   3. User preferences: theme, locale, sidebar, persisted server-side globally
  *
  * Architecture:
  *   Workspace → EditorGroup[] (1 or more groups, each with independent tabs)
- *   Each group has its own tab list and active tab — like VS Code editor groups.
+ *   Each group has its own tab list and active tab, like VS Code editor groups.
  *   When there are 2+ groups, a split view is rendered.
  *
  * Multiple browser tabs can independently view different workspaces without
- * interfering — each tab reads its workspace path from the URL and loads/saves
+ * interfering; each tab reads its workspace path from the URL and loads/saves
  * only that workspace's state.
  */
 
@@ -26,6 +26,7 @@ import {
 } from '$lib/apis/state';
 import { listSessions, createSession, deleteSession } from '$lib/apis/terminal';
 import { changeLocale, i18next } from '$lib/i18n';
+import { streamingChatTabs } from '$lib/stores/chat';
 
 // ── Types ───────────────────────────────────────────────────────
 
@@ -61,10 +62,12 @@ export interface WorkspaceState {
 	fileBrowserCwd: string;
 }
 
+export type ToolApprovalMode = 'ask' | 'auto' | 'full';
+
 export interface UserPreferences {
 	theme: Theme;
 	sidebarOpen: boolean;
-	autoApproveTools: boolean;
+	toolApprovalMode: ToolApprovalMode;
 	locale: string;
 }
 
@@ -111,14 +114,20 @@ export const workspaceList = writable<{ path: string; name: string }[]>([]);
 /** Global user preferences. */
 export const sidebarOpen = writable(typeof window !== 'undefined' ? window.innerWidth >= 768 : false);
 export const theme = writable<Theme>('dark');
-export const autoApproveTools = writable(false);
+export const toolApprovalMode = writable<ToolApprovalMode>('ask');
+/** @deprecated Use toolApprovalMode */
+export const autoApproveTools = {
+	subscribe: toolApprovalMode.subscribe,
+	set: (v: boolean) => toolApprovalMode.set(v ? 'full' : 'ask'),
+	update: (fn: (v: boolean) => boolean) => toolApprovalMode.update((m) => fn(m === 'full') ? 'full' : 'ask'),
+};
 export const stateLoaded = writable(false);
 export const gitReviewOpen = writable(false);
 export const isGitRepo = writable(false);
 
 // ── Derived stores ──────────────────────────────────────────────
 
-/** @deprecated Alias for currentWorkspace — helps migration of existing imports */
+/** @deprecated Alias for currentWorkspace. Helps migration of existing imports */
 export const activeWorkspace = currentWorkspace;
 
 export const activeGroup = derived(currentWorkspace, ($ws) =>
@@ -138,7 +147,7 @@ export const splitActive = derived(currentWorkspace, ($ws) =>
 /** @deprecated Use splitActive */
 export const splitPaneOpen = splitActive;
 
-/** @deprecated — the "split tab" is now the active tab of the second group */
+/** @deprecated The "split tab" is now the active tab of the second group */
 export const splitTab = derived(currentWorkspace, ($ws) => {
 	if (!$ws || $ws.groups.length < 2) return null;
 	const secondGroup = $ws.groups.find((g) => g.id !== $ws.activeGroupId) ?? $ws.groups[1];
@@ -198,7 +207,7 @@ export function closeSplitPane(): void {
 	}
 }
 
-/** @deprecated No direct equivalent — swap active group focus */
+/** @deprecated No direct equivalent. Swaps active group focus */
 export function swapSplitPanes(): void {
 	const ws = get(currentWorkspace);
 	if (!ws || ws.groups.length < 2) return;
@@ -240,7 +249,7 @@ function persistPreferences(): void {
 		const prefs: UserPreferences = {
 			theme: get(theme),
 			sidebarOpen: get(sidebarOpen),
-			autoApproveTools: get(autoApproveTools),
+			toolApprovalMode: get(toolApprovalMode),
 			locale: i18next.language,
 		};
 		savePreferences(prefs as unknown as Record<string, unknown>).catch(() => {});
@@ -254,7 +263,7 @@ function subscribeForPersistence() {
 	currentWorkspace.subscribe(() => { if (get(stateLoaded)) persistWorkspace(); });
 	theme.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
 	sidebarOpen.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
-	autoApproveTools.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
+	toolApprovalMode.subscribe(() => { if (get(stateLoaded)) persistPreferences(); });
 	i18next.on('languageChanged', () => { if (get(stateLoaded)) persistPreferences(); });
 }
 
@@ -265,7 +274,13 @@ export async function loadPreferences(): Promise<void> {
 		const prefs = await getPreferences();
 		if (prefs.theme) theme.set(prefs.theme as Theme);
 		if (prefs.sidebarOpen !== undefined) sidebarOpen.set(prefs.sidebarOpen as boolean);
-		if (prefs.autoApproveTools !== undefined) autoApproveTools.set(prefs.autoApproveTools as boolean);
+		// Support new toolApprovalMode and legacy boolean autoApproveTools
+		if (prefs.toolApprovalMode) {
+			toolApprovalMode.set(prefs.toolApprovalMode as ToolApprovalMode);
+		} else if (prefs.autoApproveTools !== undefined) {
+			// Legacy boolean migration
+			toolApprovalMode.set((prefs.autoApproveTools as unknown as boolean) ? 'full' : 'ask');
+		}
 		if (prefs.locale) changeLocale(prefs.locale as string);
 	} catch {
 		// First run, no preferences yet
@@ -330,11 +345,11 @@ export async function loadWorkspace(path: string): Promise<void> {
 				fileBrowserCwd: ws.fileBrowserCwd ?? path,
 			});
 		} else {
-			// First time opening this workspace — create defaults
+			// First time opening this workspace, create defaults
 			currentWorkspace.set(createDefaultWorkspace(path));
 		}
 	} catch {
-		// Error loading — create fresh workspace
+		// Error loading, create fresh workspace
 		currentWorkspace.set(createDefaultWorkspace(path));
 	}
 }
@@ -377,7 +392,7 @@ if (typeof window !== 'undefined') {
 
 /**
  * Register a workspace path in the sidebar list.
- * Does NOT set currentWorkspace — that happens when the URL changes
+ * Does NOT set currentWorkspace. That happens when the URL changes
  * (via goto() in the calling component), which triggers loadWorkspace().
  * The URL is the single source of truth for which workspace is active.
  */
@@ -598,6 +613,11 @@ export function closeTab(tabId: string, groupId?: string): void {
 
 	if (tab.type === 'terminal' && tab.sessionId) {
 		deleteSession(tab.sessionId);
+	}
+
+	// Clean up streaming indicator for closed chat tabs
+	if (tab.type === 'chat') {
+		streamingChatTabs.update((s) => { const n = new Set(s); n.delete(tabId); return n; });
 	}
 
 	currentWorkspace.update((ws) => {

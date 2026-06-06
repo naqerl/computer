@@ -125,7 +125,7 @@
 		onmousedown={(e) => e.stopPropagation()}
 		onkeydown={() => {}}
 	>
-		<!-- Filename input — same pattern as QuickOpen search bar -->
+		<!-- Filename input: same pattern as QuickOpen search bar -->
 		<div class="flex items-center px-4 py-3 gap-2.5 border-b border-gray-200 dark:border-white/6">
 			<Icon name="empty-page" size={16} class="text-gray-400 shrink-0" />
 			<input

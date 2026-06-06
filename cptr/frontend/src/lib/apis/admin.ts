@@ -1,5 +1,5 @@
 /**
- * Admin API — user management, instance config.
+ * Admin API: user management, instance config.
  */
 import { fetchJSON, jsonBody } from '$lib/apis';
 

@@ -364,10 +364,10 @@
 
 				<!-- Tab content -->
 				<div class="pane-content">
-					{#if $gitReviewOpen && i === 0}
+				{#if $gitReviewOpen && i === 0}
 						<GitView />
 					{:else}
-						<!-- Persist all file editor instances so drafts survive tab switches -->
+						<!-- Persist all tab instances so state survives tab switches (like VS Code) -->
 						{#each group.tabs.filter(t => t.type === 'file' && t.filePath) as tab (tab.id)}
 							<div
 								class="persisted-tab"
@@ -377,23 +377,40 @@
 							</div>
 						{/each}
 
-						<!-- Non-file tab content (rendered only when active) -->
+						{#each group.tabs.filter(t => t.type === 'chat') as tab (tab.id)}
+							<div
+								class="persisted-tab"
+								class:persisted-tab-hidden={tab.id !== group.activeTabId}
+							>
+								<ChatPanel workspace={$currentWorkspace.path} chatId={tab.path?.startsWith('new-') || tab.path?.startsWith('pending-') ? undefined : tab.path} tabId={tab.id} />
+							</div>
+						{/each}
+
+						{#each group.tabs.filter(t => t.type === 'terminal' && t.sessionId) as tab (tab.id)}
+							<div
+								class="persisted-tab"
+								class:persisted-tab-hidden={tab.id !== group.activeTabId}
+							>
+								<Terminal sessionId={tab.sessionId} />
+							</div>
+						{/each}
+
+						{#each group.tabs.filter(t => t.type === 'preview' && t.port) as tab (tab.id)}
+							<div
+								class="persisted-tab"
+								class:persisted-tab-hidden={tab.id !== group.activeTabId}
+							>
+								<PortPreview port={tab.port} />
+							</div>
+						{/each}
+
+						<!-- Fallback content for non-persisted states -->
 						{#if !groupTab || groupTab.type === 'files'}
 							<FileBrowser />
-						{:else if groupTab.type === 'terminal' && groupTab.sessionId}
-							{#key groupTab.sessionId}
-								<Terminal sessionId={groupTab.sessionId} />
-							{/key}
 						{:else if groupTab.type === 'terminal' && !groupTab.sessionId}
 							<div class="flex items-center justify-center h-full">
 								<div class="w-5 h-5 border-2 border-gray-800 border-t-gray-400 rounded-full animate-spin"></div>
 							</div>
-						{:else if groupTab.type === 'chat'}
-							{#key groupTab.id}
-								<ChatPanel workspace={$currentWorkspace.path} chatId={groupTab.path?.startsWith('new-') || groupTab.path?.startsWith('pending-') ? undefined : groupTab.path} tabId={groupTab.id} />
-							{/key}
-						{:else if groupTab.type === 'preview' && groupTab.port}
-							<PortPreview port={groupTab.port} />
 						{/if}
 					{/if}
 				</div>

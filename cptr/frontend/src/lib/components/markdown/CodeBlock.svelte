@@ -32,7 +32,7 @@
 	// Cache hljs module
 	let hljsModule: any = null;
 
-	// Highlight non-diff code — reactive so it re-runs on prop changes (streaming)
+	// Highlight non-diff code: reactive so it re-runs on prop changes (streaming)
 	$effect(() => {
 		if (isDiff || !codeEl) return;
 		const currentCode = code;
@@ -92,7 +92,6 @@
 	.code-block {
 		border-radius: 8px;
 		overflow: hidden;
-		margin: 0 0 12px;
 		background: var(--color-gray-100);
 		border: 1px solid var(--color-gray-200);
 	}

@@ -1,8 +1,8 @@
-"""Managed file uploads — blob storage + DB metadata.
+"""Managed file uploads: blob storage + DB metadata.
 
-POST   /api/files         — multipart upload → storage + DB → { id, url }
-GET    /api/files/{id}    — stream from storage (cache headers)
-DELETE /api/files/{id}    — verify ownership → delete storage + DB
+POST   /api/files         multipart upload → storage + DB → { id, url }
+GET    /api/files/{id}    stream from storage (cache headers)
+DELETE /api/files/{id}    verify ownership → delete storage + DB
 """
 
 from __future__ import annotations
@@ -57,7 +57,7 @@ async def upload(request: Request, file: UploadFile = FastAPIFile(...)):
 
 @router.get("/{file_id_ext:path}")
 async def get_upload(file_id_ext: str):
-    """Serve an uploaded file. Public (no auth) — UUID is unguessable.
+    """Serve an uploaded file. Public (no auth); UUID is unguessable.
 
     Accepts both /api/files/{uuid} and /api/files/{uuid}.{ext} so that
     URLs with file extensions work correctly.

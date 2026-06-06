@@ -9,7 +9,7 @@
 
 	let { editor }: Props = $props();
 
-	// Reactive state — recompute on every editor transaction
+	// Reactive state: recompute on every editor transaction
 	let active = $state({
 		bold: false,
 		italic: false,

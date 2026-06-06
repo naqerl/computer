@@ -1,5 +1,5 @@
 /**
- * Auth API — login, setup, session, logout.
+ * Auth API: login, setup, session, logout.
  */
 import { fetchHandler, fetchJSON, jsonBody } from '$lib/apis';
 

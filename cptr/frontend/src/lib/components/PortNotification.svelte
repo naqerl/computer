@@ -7,7 +7,7 @@
 	// ONLY show ports that belong to a terminal session in the active workspace
 	let relevantPorts = $derived(
 		systemEvents.newPorts.filter((p) => {
-			if (!p.session_id) return false; // unknown origin — don't show
+			if (!p.session_id) return false; // unknown origin, don't show
 			// Check if this session belongs to the active workspace
 			return $activeWorkspace?.groups.some((g) => g.tabs.some((t) => t.sessionId === p.session_id)) ?? false;
 		})

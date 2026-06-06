@@ -1,5 +1,5 @@
 /**
- * State API — user preferences, workspace state, welcome/system info.
+ * State API: user preferences, workspace state, welcome/system info.
  *
  * State is split into three layers:
  *   - preferences: global user prefs (theme, locale, etc.)

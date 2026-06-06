@@ -1,4 +1,4 @@
-"""Chat router — CRUD for chats + model aggregation."""
+"""Chat router: CRUD for chats + model aggregation."""
 
 from __future__ import annotations
 
@@ -92,7 +92,7 @@ async def _get_connections() -> list[dict]:
 # ── Model cache (app.state) ─────────────────────────────────
 
 async def _get_connection_models(conn: dict, app_state) -> list[str]:
-    """Get models for a connection — from stored data, cache, or auto-discover."""
+    """Get models for a connection: from stored data, cache, or auto-discover."""
     stored = conn.get("data", {}).get("models")
     if stored:
         return stored
@@ -112,7 +112,7 @@ async def _get_connection_models(conn: dict, app_state) -> list[str]:
 
 
 def invalidate_model_cache(app_state):
-    """Clear cached models — call after connection create/update/delete."""
+    """Clear cached models. Call after connection create/update/delete."""
     app_state.MODELS = {}
 
 
@@ -302,10 +302,10 @@ async def send_message(body: SendMessageRequest, request: Request):
     parent_msg = await ChatMessage.get_by_id(body.parent_id) if body.parent_id else None
 
     if parent_msg and parent_msg.role == "user":
-        # Regeneration — create assistant as sibling of existing response
+        # Regeneration: create assistant as sibling of existing response
         assistant_parent = body.parent_id
     else:
-        # Normal send — create user message first
+        # Normal send: create user message first
         user_msg = await ChatMessage.create(
             chat_id=chat.id,
             role="user",
@@ -433,7 +433,7 @@ async def cancel_task_endpoint(
 
     if not found:
         # Task already exited (e.g., waiting for tool approval) but message
-        # may still be marked done=False — force-finalize it.
+        # may still be marked done=False, force-finalize it.
         msg = await ChatMessage.get_by_id(message_id)
         if msg and not msg.done:
             output = msg.output or []

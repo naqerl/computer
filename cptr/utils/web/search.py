@@ -1,4 +1,4 @@
-"""Search dispatcher — picks provider based on config.
+"""Search dispatcher: picks provider based on config.
 
 Priority in auto mode:
 1. Exa      (EXA_API_KEY or web.exa_api_key)
@@ -72,7 +72,7 @@ async def web_search_handler(query: str) -> str:
                 return f"Error: unknown search provider '{provider}'."
         except Exception as e:
             logger.error("Search provider %s failed: %s", provider, e)
-            return f"Error: {provider} search failed — {e}"
+            return f"Error: {provider} search failed. {e}"
 
     # Auto mode: try each provider with a key, fall back to DuckDuckGo
     providers = []

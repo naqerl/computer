@@ -10,7 +10,7 @@ export async function fetchHandler(path: string, init?: RequestInit): Promise<Re
 		...init,
 		credentials: 'include',
 	});
-	// 401 on non-auth endpoints means the session expired — auto-logout.
+	// 401 on non-auth endpoints means the session expired; auto-logout.
 	// Auth endpoints (login, session check) naturally return 401; don't intercept those.
 	if (res.status === 401 && !path.startsWith('/api/auth') && !path.startsWith('/api/config')) {
 		clearSession();

@@ -28,10 +28,6 @@
 			boundsPadding: 0.1,
 			zoomSpeed: 0.065,
 			smoothScroll: false,
-			beforeWheel(e) {
-				if (!e.ctrlKey && !e.metaKey) return true;
-				return false;
-			},
 			beforeMouseDown() {
 				const t = pzInstance?.getTransform();
 				if (t && Math.abs(t.scale - 1) < 0.01) return true;

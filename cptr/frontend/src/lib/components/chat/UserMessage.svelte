@@ -66,7 +66,7 @@
 
 <div class="group">
 	{#if edit}
-		<!-- Edit mode — full width -->
+		<!-- Edit mode: full width -->
 		<div class="w-full">
 			<div class="bg-gray-50 dark:bg-white/4 rounded-xl border border-gray-200 dark:border-white/8 px-3.5 py-2.5">
 				<textarea
@@ -96,7 +96,7 @@
 			</div>
 		</div>
 	{:else}
-		<!-- Bubble — right-aligned -->
+		<!-- Bubble: right-aligned -->
 		<div class="flex justify-end">
 			<div class="max-w-[90%] px-4 py-2 rounded-3xl bg-gray-50 dark:bg-white/[0.06]">
 				<div class="text-[13px] leading-relaxed text-gray-900 dark:text-gray-200 whitespace-pre-wrap break-words">{content}</div>

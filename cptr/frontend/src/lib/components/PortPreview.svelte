@@ -101,7 +101,7 @@
 				}
 			}
 		} catch {
-			// Cross-origin — can't access
+			// Cross-origin, can't access
 		}
 	}
 

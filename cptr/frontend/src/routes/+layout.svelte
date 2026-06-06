@@ -17,7 +17,7 @@
 	import { getSession, getConfig } from '$lib/apis/auth';
 	import { getGitStatus } from '$lib/apis/git';
 	import { t } from '$lib/i18n';
-	import { refreshChatState } from '$lib/stores/chat';
+	import { refreshChatState, bindGlobalChatListener } from '$lib/stores/chat';
 
 	let { children } = $props();
 	let showQuickOpen = $state(false);
@@ -151,6 +151,7 @@
 		if (ws) {
 			systemEvents.connect(ws.fileBrowserCwd || ws.path);
 			socketStore.connect();
+			bindGlobalChatListener();
 		} else {
 			systemEvents.disconnect();
 			socketStore.disconnect();

@@ -1,5 +1,5 @@
 /**
- * Files API — browse, read, write, move, delete, upload, archive, search.
+ * Files API: browse, read, write, move, delete, upload, archive, search.
  */
 import { fetchHandler, fetchJSON, jsonBody } from '$lib/apis';
 

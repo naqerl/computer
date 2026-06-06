@@ -1,4 +1,4 @@
-"""File metadata model — tracks uploaded blobs in the DB."""
+"""File metadata model: tracks uploaded blobs in the DB."""
 
 from __future__ import annotations
 

@@ -96,7 +96,7 @@ async def terminal_ws(websocket: WebSocket, session_id: str):
     async def read_pty():
         """Read from PTY and send to WebSocket.
 
-        Event-driven via add_reader — wakes instantly when the PTY has
+        Event-driven via add_reader. Wakes instantly when the PTY has
         output (0 ms latency vs 5 ms poll-sleep).  Batch-reads all
         available data into a single WebSocket frame to minimise framing
         overhead.
@@ -119,7 +119,7 @@ async def terminal_ws(websocket: WebSocket, session_id: str):
                         logger.error(f"PTY read error for {session_id}: {e}")
                         break
             else:
-                # Unix — event-driven, zero-latency
+                # Unix: event-driven, zero-latency
                 loop = asyncio.get_running_loop()
                 readable = asyncio.Event()
                 loop.add_reader(session._fd, readable.set)

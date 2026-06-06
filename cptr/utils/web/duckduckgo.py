@@ -1,4 +1,4 @@
-"""DuckDuckGo search — zero-config fallback (no API key needed).
+"""DuckDuckGo search: zero-config fallback (no API key needed).
 
 Scrapes the HTML lite endpoint. No rate-limit guarantees, but
 works without any setup, making it a useful default.

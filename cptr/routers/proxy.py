@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/proxy", tags=["proxy"])
 
-# Shared async client — reused across requests
+# Shared async client, reused across requests
 _client: httpx.AsyncClient | None = None
 
 

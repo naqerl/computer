@@ -32,7 +32,7 @@ function connect(watchPath: string) {
 	currentWatchPath = watchPath;
 
 	if (ws && ws.readyState <= WebSocket.OPEN) {
-		// Already connected — just update watch path
+		// Already connected, just update watch path
 		if (ws.readyState === WebSocket.OPEN) {
 			ws.send(JSON.stringify({ type: 'watch_path', path: watchPath }));
 		}

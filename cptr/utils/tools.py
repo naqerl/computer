@@ -1,8 +1,8 @@
-"""Tool definitions — plain functions with schema introspection.
+"""Tool definitions: plain functions with schema introspection.
 
 Tools are real async functions. Schemas are auto-generated from
 type hints + docstrings via inspect. The LLM never sees the
-`workspace` parameter — it's injected by the task runner.
+`workspace` parameter; it's injected by the task runner.
 """
 
 from __future__ import annotations
@@ -187,7 +187,7 @@ async def search_files(
     try:
         return await _search_rg(query, full, regex, case_insensitive, include, filenames_only)
     except FileNotFoundError:
-        # ripgrep not installed — fall back to Python
+        # ripgrep not installed, fall back to Python
         return await _search_python(query, full, case_insensitive)
 
 
