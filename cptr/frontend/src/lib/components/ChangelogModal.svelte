@@ -8,22 +8,15 @@
 	type VersionData = { date: string; [section: string]: string | ChangelogEntry[] };
 
 	let changelog = $state<Record<string, VersionData> | null>(null);
-	let selectedVersion = $state<string | null>(null);
 	let error = $state(false);
 
 	const versions = $derived.by(() => (changelog ? Object.entries(changelog) : []));
-	const selectedData = $derived.by(() => {
-		if (!versions.length) return null;
-		const version = selectedVersion ?? versions[0][0];
-		return versions.find(([ver]) => ver === version) ?? versions[0];
-	});
 
 	$effect(() => {
 		if ($showChangelog && !changelog && !error) {
 			fetchJSON<Record<string, VersionData>>('/api/changelog')
 				.then((data) => {
 					changelog = data;
-					selectedVersion = Object.keys(data)[0] ?? null;
 				})
 				.catch(() => {
 					error = true;
@@ -68,10 +61,9 @@
 		<div class="flex items-center gap-3 px-4 pt-4 pb-2 shrink-0">
 			<div class="min-w-0 flex-1">
 				<h2 class="text-sm font-medium text-gray-900 dark:text-white">What's New</h2>
-				{#if selectedData}
-					{@const [ver, data] = selectedData}
+				{#if $appVersion}
 					<p class="mt-0.5 text-[11px] text-gray-400 dark:text-gray-600">
-						v{ver} · {formatDate(data.date)}
+						Release Notes
 					</p>
 				{/if}
 			</div>
@@ -85,63 +77,62 @@
 			</button>
 		</div>
 
-		{#if versions.length > 1}
-			<div class="flex gap-1 overflow-x-auto px-3 pb-2 shrink-0 scrollbar-hidden">
-				{#each versions as [ver], i (ver)}
-					<button
-						class="h-7 shrink-0 rounded-lg px-2 text-[11px] transition-colors duration-75
-							{(selectedVersion ?? versions[0][0]) === ver
-							? 'bg-gray-100 text-gray-900 dark:bg-white/6 dark:text-white'
-							: 'text-gray-400 hover:text-gray-700 dark:text-gray-600 dark:hover:text-gray-300'}"
-						onclick={() => (selectedVersion = ver)}
-					>
-						v{ver}{#if i === 0}<span
-								class="ml-1 font-sans text-[9px] text-gray-300 dark:text-gray-700">latest</span
-							>{/if}
-					</button>
-				{/each}
-			</div>
-		{/if}
-
 		<div class="flex-1 min-h-0 overflow-y-auto px-4 py-3">
-			{#if selectedData}
-				{@const [_ver, data] = selectedData}
+			{#if versions.length > 0}
 				<div class="space-y-6">
-					{#each Object.entries(data).filter(([key]) => key !== 'date') as [section, items]}
-						{#if Array.isArray(items) && items.length > 0}
-							<section>
-								<h3
-									class="mb-2 text-[10px] font-medium uppercase tracking-wide text-gray-400 dark:text-gray-600"
-								>
-									{section}
-								</h3>
-								<ul class="space-y-2.5">
-									{#each items as entry}
-										<li class="flex gap-2.5 text-xs leading-relaxed">
-											<span
-												class="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-gray-300 dark:bg-gray-700"
-											></span>
-											<div class="min-w-0">
-												{#if entry.title}
-													<span class="font-medium text-gray-900 dark:text-white"
-														>{entry.title}</span
-													>
-													{#if entry.content}
-														<span class="ml-1 text-gray-500 dark:text-gray-400"
-															>{entry.content}</span
-														>
-													{/if}
-												{:else}
-													<span class="text-gray-600 dark:text-gray-400"
-														>{entry.content || entry.raw}</span
-													>
-												{/if}
-											</div>
-										</li>
-									{/each}
-								</ul>
-							</section>
-						{/if}
+					{#each versions as [ver, data], i}
+						<div>
+							<div class="mb-2">
+								<h3 class="text-[13px] font-semibold text-gray-900 dark:text-white">v{ver}</h3>
+								<p class="text-[10px] text-gray-400 dark:text-gray-600 mt-0.5">{formatDate(data.date)}</p>
+							</div>
+
+							{#each Object.entries(data).filter(([key]) => key !== 'date') as [section, items]}
+								{#if Array.isArray(items) && items.length > 0}
+									<div class="mb-3">
+										<span
+											class="inline-block text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 my-1.5
+											{section === 'added'
+												? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
+												: section === 'fixed'
+													? 'bg-green-500/10 text-green-600 dark:text-green-400'
+													: section === 'changed'
+														? 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
+														: section === 'removed'
+															? 'bg-red-500/10 text-red-600 dark:text-red-400'
+															: 'text-gray-400 dark:text-gray-600'}"
+										>
+											{section}
+										</span>
+										<ul class="space-y-2 mt-1.5">
+											{#each items as entry}
+												<li class="flex gap-2.5 text-xs leading-relaxed">
+													<span
+														class="mt-[0.45em] h-1 w-1 shrink-0 rounded-full bg-gray-300 dark:bg-gray-700"
+													></span>
+													<div class="min-w-0">
+														{#if entry.title}
+															<span class="font-medium text-gray-900 dark:text-white"
+																>{entry.title}</span
+															>
+															{#if entry.content}
+																<span class="ml-1 text-gray-500 dark:text-gray-400"
+																	>{entry.content}</span
+																>
+															{/if}
+														{:else}
+															<span class="text-gray-600 dark:text-gray-400"
+																>{entry.content || entry.raw}</span
+															>
+														{/if}
+													</div>
+												</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+							{/each}
+						</div>
 					{/each}
 				</div>
 			{:else if error}
