@@ -1,3 +1,9 @@
+<script module>
+	// Module-level cache: survives component destroy/create cycles
+	const _treeExpandedCache = new Map();
+	const _treeContentsCache = new Map();
+</script>
+
 <script lang="ts">
 	import { activeWorkspace, setFileBrowserCwd, openFileTab, openPreviewTab } from '$lib/stores';
 	import { systemEvents } from '$lib/stores/systemEvents.svelte';
@@ -12,6 +18,11 @@
 		type: string;
 		size: number | null;
 		modified: string | null;
+	}
+
+	interface TreeEntry extends FileEntry {
+		path: string;
+		depth: number;
 	}
 
 	let entries = $state<FileEntry[]>([]);
@@ -31,6 +42,10 @@
 	let sortBtnEl: HTMLButtonElement | undefined = $state();
 	let addBtnEl: HTMLButtonElement | undefined = $state();
 
+	// Tree view
+	let expandedDirs = $state<Set<string>>(new Set());
+	let dirContents = $state<Map<string, FileEntry[]>>(new Map());
+
 	// Sort
 	let sortBy = $state<'name' | 'size' | 'modified'>('name');
 	let sortDir = $state<'asc' | 'desc'>('asc');
@@ -41,7 +56,7 @@
 	let dragOverBreadcrumb = $state<string | null>(null);
 
 	// Context menu
-	let contextMenu = $state<{ x: number; y: number; entry: FileEntry; anchor?: HTMLElement } | null>(null);
+	let contextMenu = $state<{ x: number; y: number; entry: TreeEntry; anchor?: HTMLElement } | null>(null);
 	let renamingEntry = $state<string | null>(null);
 	let renameValue = $state('');
 
@@ -70,10 +85,26 @@
 	});
 
 	// Fetch directory on cwd change
+	let _prevCwd = '';
 	$effect(() => {
 		if (cwd) {
-			// Immediate fetch for navigation
-			fetchDirectoryImmediate(cwd);
+			if (cwd !== _prevCwd) {
+				const isNavigation = _prevCwd !== '';
+				_prevCwd = cwd;
+				if (isNavigation) {
+					// Navigated to a new directory: reset tree state
+					expandedDirs = new Set();
+					dirContents = new Map();
+				} else {
+					// Component (re)mount: restore tree state from cache
+					const cachedExpanded = _treeExpandedCache.get(cwd);
+					if (cachedExpanded) {
+						expandedDirs = new Set(cachedExpanded);
+						dirContents = new Map(_treeContentsCache.get(cwd) ?? []);
+					}
+				}
+				fetchDirectoryImmediate(cwd);
+			}
 		}
 	});
 
@@ -90,6 +121,10 @@
 		const _tick = systemEvents.fsTick; // subscribe
 		if (_tick > 0 && cwd && !fetching && systemEvents.isRelevantFsChange(cwd)) {
 			debouncedFetch(cwd);
+			// Also refresh expanded directories
+			for (const dir of expandedDirs) {
+				fetchSubdir(dir);
+			}
 		}
 	});
 
@@ -97,6 +132,11 @@
 		showHidden = !showHidden;
 		localStorage.setItem('fileBrowser:showHidden', String(showHidden));
 		fetchDirectory(cwd);
+		// Clear cache and re-fetch expanded dirs with new filter
+		dirContents = new Map();
+		for (const dir of expandedDirs) {
+			fetchSubdir(dir);
+		}
 	}
 
 	function debouncedFetch(path: string) {
@@ -138,27 +178,78 @@
 		debouncedFetch(path);
 	}
 
-	function handleClick(e: MouseEvent, entry: FileEntry, index: number) {
-		const fullPath = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name;
+	// ── Tree view: expand/collapse ─────────────────────────────
+	function saveTreeCache() {
+		if (cwd) {
+			_treeExpandedCache.set(cwd, [...expandedDirs]);
+			_treeContentsCache.set(cwd, [...dirContents.entries()]);
+		}
+	}
 
+	async function toggleDir(path: string) {
+		if (expandedDirs.has(path)) {
+			const next = new Set(expandedDirs);
+			next.delete(path);
+			expandedDirs = next;
+		} else {
+			if (!dirContents.has(path)) {
+				await fetchSubdir(path);
+			}
+			const next = new Set(expandedDirs);
+			next.add(path);
+			expandedDirs = next;
+		}
+		saveTreeCache();
+	}
+
+	async function fetchSubdir(path: string) {
+		try {
+			const data = await listDir(path);
+			const filtered = showHidden
+				? data.entries
+				: data.entries.filter((e: FileEntry) => !e.name.startsWith('.'));
+			dirContents = new Map(dirContents).set(path, filtered);
+			saveTreeCache();
+		} catch {
+			// Remove from expanded on error
+			const next = new Set(expandedDirs);
+			next.delete(path);
+			expandedDirs = next;
+			const nextContents = new Map(dirContents);
+			nextContents.delete(path);
+			dirContents = nextContents;
+			saveTreeCache();
+		}
+	}
+
+	/** Refresh a specific expanded directory's cached contents */
+	async function refreshParentDir(entryPath: string) {
+		const parentDir = entryPath.substring(0, entryPath.lastIndexOf('/'));
+		if (parentDir === cwd || parentDir === cwd.replace(/\/$/, '')) {
+			fetchDirectory(cwd);
+		} else if (dirContents.has(parentDir)) {
+			await fetchSubdir(parentDir);
+		}
+	}
+
+	function handleClick(e: MouseEvent, entry: TreeEntry, index: number) {
 		// Multi-select with ctrl/cmd or shift
 		if (e.metaKey || e.ctrlKey) {
 			const next = new Set(selectedPaths);
-			if (next.has(fullPath)) next.delete(fullPath);
-			else next.add(fullPath);
+			if (next.has(entry.path)) next.delete(entry.path);
+			else next.add(entry.path);
 			selectedPaths = next;
 			lastClickedIndex = index;
 			return;
 		}
 
 		if (e.shiftKey && lastClickedIndex >= 0) {
-			const list = sortedEntries();
+			const list = visibleEntries;
 			const start = Math.min(lastClickedIndex, index);
 			const end = Math.max(lastClickedIndex, index);
 			const next = new Set(selectedPaths);
 			for (let i = start; i <= end; i++) {
-				const p = cwd.endsWith('/') ? cwd + list[i].name : cwd + '/' + list[i].name;
-				next.add(p);
+				next.add(list[i].path);
 			}
 			selectedPaths = next;
 			return;
@@ -168,9 +259,9 @@
 		selectedPaths = new Set();
 		lastClickedIndex = index;
 		if (entry.type === 'directory') {
-			setFileBrowserCwd(fullPath);
+			toggleDir(entry.path);
 		} else {
-			openFileTab(fullPath);
+			openFileTab(entry.path);
 		}
 	}
 
@@ -210,15 +301,10 @@
 		return `${(bytes / 1048576).toFixed(1)} MB`;
 	}
 
-	let filteredEntries = $derived(
-		searchQuery
-			? entries.filter((e) => e.name.toLowerCase().includes(searchQuery.toLowerCase()))
-			: entries
-	);
-
-	let sortedEntries = $derived(() => {
-		const dirs = filteredEntries.filter((e) => e.type === 'directory');
-		const files = filteredEntries.filter((e) => e.type !== 'directory');
+	// ── Tree-aware visible entries ──────────────────────────────
+	function sortItems(items: FileEntry[]): FileEntry[] {
+		const dirs = items.filter((e) => e.type === 'directory');
+		const files = items.filter((e) => e.type !== 'directory');
 
 		function compare(a: FileEntry, b: FileEntry): number {
 			let result = 0;
@@ -235,6 +321,30 @@
 		dirs.sort(compare);
 		files.sort(compare);
 		return [...dirs, ...files];
+	}
+
+	let visibleEntries = $derived.by(() => {
+		const result: TreeEntry[] = [];
+		const query = searchQuery.toLowerCase();
+
+		function walk(parentPath: string, items: FileEntry[], depth: number) {
+			let filtered = query
+				? items.filter((e) => e.name.toLowerCase().includes(query))
+				: items;
+			for (const entry of sortItems(filtered)) {
+				const fullPath = parentPath.endsWith('/')
+					? parentPath + entry.name
+					: parentPath + '/' + entry.name;
+				result.push({ ...entry, path: fullPath, depth });
+				if (entry.type === 'directory' && expandedDirs.has(fullPath)) {
+					const children = dirContents.get(fullPath);
+					if (children) walk(fullPath, children, depth + 1);
+				}
+			}
+		}
+
+		walk(cwd, entries, 0);
+		return result;
 	});
 
 	function toggleSort(field: 'name' | 'size' | 'modified') {
@@ -253,9 +363,8 @@
 
 	function selectAll() {
 		const all = new Set<string>();
-		for (const e of sortedEntries()) {
-			const p = cwd.endsWith('/') ? cwd + e.name : cwd + '/' + e.name;
-			all.add(p);
+		for (const e of visibleEntries) {
+			all.add(e.path);
 		}
 		selectedPaths = all;
 	}
@@ -290,34 +399,33 @@
 	}
 
 	// ── Drag to move ────────────────────────────────────────────
-	function onDragStart(e: DragEvent, entry: FileEntry) {
-		const fullPath = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name;
-		draggedItem = fullPath;
-		e.dataTransfer?.setData('text/plain', fullPath);
+	function onDragStart(e: DragEvent, entry: TreeEntry) {
+		draggedItem = entry.path;
+		e.dataTransfer?.setData('text/plain', entry.path);
 		if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
 	}
 
-	function onDragOverDir(e: DragEvent, entry: FileEntry) {
+	function onDragOverDir(e: DragEvent, entry: TreeEntry) {
 		if (entry.type !== 'directory') return;
 		e.preventDefault();
 		if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
-		dragOverDir = entry.name;
+		dragOverDir = entry.path;
 	}
 
 	function onDragLeaveDir() {
 		dragOverDir = null;
 	}
 
-	async function onDropOnDir(e: DragEvent, entry: FileEntry) {
+	async function onDropOnDir(e: DragEvent, entry: TreeEntry) {
 		e.preventDefault();
 		dragOverDir = null;
 
 		// Handle file browser item drag
 		if (draggedItem) {
-			const dest = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name;
 			try {
-				await moveFile(draggedItem, dest);
+				await moveFile(draggedItem, entry.path);
 				fetchDirectory(cwd);
+				refreshParentDir(draggedItem);
 			} catch {}
 			draggedItem = null;
 			return;
@@ -326,8 +434,7 @@
 		// Handle external file upload
 		const files = e.dataTransfer?.files;
 		if (files && files.length) {
-			const dest = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name;
-			await uploadFiles(files, dest);
+			await uploadFiles(files, entry.path);
 		}
 	}
 
@@ -438,12 +545,12 @@
 	}
 
 	// ── Context menu ───────────────────────────────────────────
-	function onContextMenu(e: MouseEvent, entry: FileEntry) {
+	function onContextMenu(e: MouseEvent, entry: TreeEntry) {
 		e.preventDefault();
 		contextMenu = { x: e.clientX, y: e.clientY, entry };
 	}
 
-	function openEntryMenu(e: MouseEvent, entry: FileEntry) {
+	function openEntryMenu(e: MouseEvent | KeyboardEvent, entry: TreeEntry) {
 		e.stopPropagation();
 		contextMenu = { x: 0, y: 0, entry, anchor: e.currentTarget as HTMLElement };
 	}
@@ -452,41 +559,51 @@
 		contextMenu = null;
 	}
 
-	function startRename(entry: FileEntry) {
-		renamingEntry = entry.name;
+	function startRename(entry: TreeEntry) {
+		renamingEntry = entry.path;
 		renameValue = entry.name;
 		closeMenu();
 	}
 
-	async function confirmRename(oldName: string) {
+	async function confirmRename(entryPath: string) {
+		const oldName = entryPath.split('/').pop() ?? '';
 		if (!renameValue.trim() || renameValue === oldName) {
 			renamingEntry = null;
 			return;
 		}
-		const src = cwd.endsWith('/') ? cwd + oldName : cwd + '/' + oldName;
-		const dst = cwd.endsWith('/') ? cwd + renameValue.trim() : cwd + '/' + renameValue.trim();
+		const parentDir = entryPath.substring(0, entryPath.lastIndexOf('/'));
+		const dst = parentDir + '/' + renameValue.trim();
 		try {
-			await moveFile(src, dst);
+			await moveFile(entryPath, dst);
 			fetchDirectory(cwd);
+			if (dirContents.has(parentDir)) await fetchSubdir(parentDir);
 		} catch {}
 		renamingEntry = null;
 	}
 
-	async function deleteEntry(entry: FileEntry) {
-		const fullPath = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name;
+	async function deleteEntry(entry: TreeEntry) {
 		const label = entry.type === 'directory' ? $t('files.folder') : $t('files.file');
 		if (!confirm($t('files.deleteEntryConfirm', { type: label, name: entry.name }))) return;
 		try {
-			await deleteFiles([fullPath]);
+			await deleteFiles([entry.path]);
 			fetchDirectory(cwd);
+			refreshParentDir(entry.path);
+			// Clean up expand state for deleted directories
+			if (entry.type === 'directory') {
+				const next = new Set(expandedDirs);
+				next.delete(entry.path);
+				expandedDirs = next;
+				const nextContents = new Map(dirContents);
+				nextContents.delete(entry.path);
+				dirContents = nextContents;
+			}
 		} catch {}
 		closeMenu();
 	}
 
-	function downloadEntry(entry: FileEntry) {
-		const fullPath = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name;
+	function downloadEntry(entry: TreeEntry) {
 		const a = document.createElement('a');
-		a.href = `/api/workspace/files/download?path=${encodeURIComponent(fullPath)}`;
+		a.href = `/api/workspace/files/download?path=${encodeURIComponent(entry.path)}`;
 		a.download = entry.name;
 		a.click();
 		closeMenu();
@@ -627,34 +744,34 @@
 					onclick={() => fetchDirectory(cwd)}
 				>{$t('files.retry')}</button>
 			</div>
-		{:else if sortedEntries().length === 0 && !showNewInput}
+		{:else if visibleEntries.length === 0 && !showNewInput}
 			<div class="flex items-center justify-center py-12">
 				<p class="text-xs text-gray-400 dark:text-gray-600">
 					{searchQuery ? $t('files.noMatches') : $t('files.emptyDirectory')}
 				</p>
 			</div>
 		{:else}
-			{#each sortedEntries() as entry, i (entry.name)}
-				{#if renamingEntry === entry.name}
+			{#each visibleEntries as entry, i (entry.path)}
+				{#if renamingEntry === entry.path}
 					<!-- Inline rename -->
-					<div class="flex items-center gap-2 h-7 px-2">
+					<div class="flex items-center gap-2 h-7" style="padding-left: {8 + entry.depth * 16}px; padding-right: 8px;">
 						<Icon name={fileIconName(entry)} size={14} class="text-gray-400 shrink-0" />
 						<input
 							type="text"
 							class="flex-1 border-none outline-none bg-transparent text-xs text-gray-900 dark:text-white"
 							bind:value={renameValue}
-							onkeydown={(e) => { if (e.key === 'Enter') confirmRename(entry.name); if (e.key === 'Escape') renamingEntry = null; }}
-							onblur={() => confirmRename(entry.name)}
+							onkeydown={(e) => { if (e.key === 'Enter') confirmRename(entry.path); if (e.key === 'Escape') renamingEntry = null; }}
+							onblur={() => confirmRename(entry.path)}
 							autofocus
 						/>
 					</div>
 				{:else}
-					{@const fullPath = cwd.endsWith('/') ? cwd + entry.name : cwd + '/' + entry.name}
-					{@const isSelected = selectedPaths.has(fullPath)}
+					{@const isSelected = selectedPaths.has(entry.path)}
 					<!-- svelte-ignore a11y_no_static_element_interactions -->
 					<button
-						class="group flex items-center gap-2 w-full h-7 px-2 rounded-lg text-left transition-colors duration-75
-							{isSelected ? 'bg-blue-50 dark:bg-blue-500/10' : dragOverDir === entry.name ? 'bg-blue-100 dark:bg-blue-500/20' : 'hover:bg-gray-100 dark:hover:bg-white/4'}"
+						class="group flex items-center gap-1 w-full h-7 rounded-lg text-left transition-colors duration-75
+							{isSelected ? 'bg-blue-50 dark:bg-blue-500/10' : dragOverDir === entry.path ? 'bg-blue-100 dark:bg-blue-500/20' : 'hover:bg-gray-100 dark:hover:bg-white/4'}"
+						style="padding-left: {8 + entry.depth * 16}px; padding-right: 8px;"
 						onclick={(e) => handleClick(e, entry, i)}
 						oncontextmenu={(e) => onContextMenu(e, entry)}
 						draggable="true"
@@ -664,17 +781,30 @@
 						ondrop={(e) => onDropOnDir(e, entry)}
 						ondragend={onDragEnd}
 					>
+						{#if entry.type === 'directory'}
+							<span class="flex items-center justify-center w-4 shrink-0 text-gray-400 dark:text-gray-600">
+								<Icon name={expandedDirs.has(entry.path) ? 'chevron-down' : 'chevron-right'} size={10} />
+							</span>
+						{:else}
+							<span class="w-4 shrink-0"></span>
+						{/if}
 						<span class="flex items-center justify-center w-4 shrink-0 {entry.type === 'directory' ? 'text-gray-500 dark:text-gray-400' : 'text-gray-400 dark:text-gray-500'}">
 							<Icon name={fileIconName(entry)} size={14} strokeWidth={1.4} />
 						</span>
-						<span class="flex-1 text-xs text-gray-800 dark:text-gray-200 truncate">{entry.name}</span>
+						{#if entry.type === 'directory'}
+							<!-- svelte-ignore a11y_no_static_element_interactions -->
+							<span
+								class="flex-1 text-xs text-gray-800 dark:text-gray-200 truncate hover:underline cursor-pointer"
+								role="button"
+								tabindex="-1"
+								onclick={(e) => { e.stopPropagation(); setFileBrowserCwd(entry.path); }}
+								onkeydown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); setFileBrowserCwd(entry.path); } }}
+							>{entry.name}</span>
+						{:else}
+							<span class="flex-1 text-xs text-gray-800 dark:text-gray-200 truncate">{entry.name}</span>
+						{/if}
 						{#if entry.type !== 'directory' && entry.size !== null}
 							<span class="text-[11px] font-mono text-gray-400 dark:text-gray-600 shrink-0">{formatSize(entry.size)}</span>
-						{/if}
-						{#if entry.type === 'directory'}
-							<span class="text-gray-300 dark:text-gray-700 shrink-0 flex">
-								<Icon name="chevron-right" size={12} />
-							</span>
 						{/if}
 						<!-- Three-dot menu per entry -->
 						<span

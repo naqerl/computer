@@ -63,6 +63,14 @@ async def auth_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# Proxy fallback middleware: intercepts sub-resource requests for proxied
+# dev servers (JS modules, CSS, etc.) based on the Referer header chain.
+# Added after auth middleware so it wraps outermost (runs before auth),
+# since proxied sub-resources don't need cptr auth.
+from cptr.utils.proxy_middleware import ProxyFallbackMiddleware
+app.add_middleware(ProxyFallbackMiddleware)
+
+
 # Path normalization middleware (Windows: \ → / in JSON responses)
 import platform
 if platform.system() == "Windows":
