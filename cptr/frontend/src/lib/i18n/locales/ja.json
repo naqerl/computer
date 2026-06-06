@@ -197,6 +197,7 @@
 	"directory.hidden": "隠しファイル",
 	"directory.noSubdirectories": "サブディレクトリがありません",
 	"directory.goBack": "戻る",
+	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "再試行",
 
 	"saveDialog.fileNamePlaceholder": "ファイル名…",

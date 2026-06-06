@@ -196,13 +196,18 @@
 
 	/** Summary text for a tool group header */
 	function groupSummaryText(calls: any[]): string {
+		if (calls.length <= 3) {
+			// Show individual human-readable labels for small groups
+			return calls.map((c: any) => toolLabel(c.name || 'tool', c.arguments || {})).join(', ');
+		}
+		// For larger groups, show counts by tool type
 		const nameCounts: Record<string, number> = {};
 		for (const c of calls) {
 			const name = c.name || 'tool';
 			nameCounts[name] = (nameCounts[name] || 0) + 1;
 		}
 		return Object.entries(nameCounts)
-			.map(([name, count]) => count > 1 ? `${count} ${name}` : name)
+			.map(([name, count]) => count > 1 ? `${count}× ${name}` : name)
 			.join(', ');
 	}
 

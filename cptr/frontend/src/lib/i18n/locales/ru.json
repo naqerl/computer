@@ -197,6 +197,7 @@
 	"directory.hidden": "Скрытые",
 	"directory.noSubdirectories": "Нет подкаталогов",
 	"directory.goBack": "Назад",
+	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Повторить",
 
 	"saveDialog.fileNamePlaceholder": "Имя файла…",

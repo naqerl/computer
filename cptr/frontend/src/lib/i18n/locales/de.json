@@ -197,6 +197,7 @@
 	"directory.hidden": "Versteckte",
 	"directory.noSubdirectories": "Keine Unterverzeichnisse",
 	"directory.goBack": "Zurück",
+	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Erneut versuchen",
 
 	"saveDialog.fileNamePlaceholder": "Dateiname…",

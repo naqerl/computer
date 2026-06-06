@@ -197,6 +197,7 @@
 	"directory.hidden": "隱藏檔案",
 	"directory.noSubdirectories": "無子目錄",
 	"directory.goBack": "返回",
+	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "重試",
 
 	"saveDialog.fileNamePlaceholder": "檔案名稱…",

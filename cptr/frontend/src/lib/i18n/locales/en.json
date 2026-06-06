@@ -225,6 +225,7 @@
 	"directory.hidden": "Hidden",
 	"directory.noSubdirectories": "No subdirectories",
 	"directory.goBack": "Go back",
+	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "Retry",
 
 	"saveDialog.fileNamePlaceholder": "File name…",

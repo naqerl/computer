@@ -197,6 +197,7 @@
 	"directory.hidden": "숨김 파일",
 	"directory.noSubdirectories": "하위 디렉터리 없음",
 	"directory.goBack": "뒤로",
+	"directory.typePath": "Type a path... (Tab to complete)",
 	"directory.retry": "재시도",
 
 	"saveDialog.fileNamePlaceholder": "파일 이름…",

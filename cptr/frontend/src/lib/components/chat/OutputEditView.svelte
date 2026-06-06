@@ -87,11 +87,10 @@
 	// ── Display items ───────────────────────────────────────────
 
 	interface DisplayItem {
-		type: 'message' | 'function_call' | 'function_call_output';
-		index: number;
+		type: 'message' | 'reasoning' | 'function_call';
+		indices: number[];
 		item: any;
 		outputItem?: any;
-		outputIndex?: number;
 	}
 
 	function buildDisplayItems(items: any[]): DisplayItem[] {
@@ -108,15 +107,16 @@
 			const item = items[i];
 			const t = item?.type ?? '';
 			if (t === 'message') {
-				result.push({ type: 'message', index: i, item });
+				result.push({ type: 'message', indices: [i], item });
+			} else if (t === 'reasoning') {
+				result.push({ type: 'reasoning', indices: [i], item });
 			} else if (t === 'function_call') {
 				const paired = outputByCallId[item.call_id];
 				result.push({
 					type: 'function_call',
-					index: i,
+					indices: paired ? [i, paired.index] : [i],
 					item,
-					outputItem: paired?.item,
-					outputIndex: paired?.index
+					outputItem: paired?.item
 				});
 			}
 			// function_call_output is grouped with function_call
@@ -145,6 +145,23 @@
 		onChange(output);
 	}
 
+	function getReasoningText(item: any): string {
+		return (item.summary ?? item.content ?? [])
+			.filter((p: any) => 'text' in p)
+			.map((p: any) => p.text ?? '')
+			.join('');
+	}
+
+	function updateReasoningText(idx: number, text: string) {
+		const next = [...output];
+		const item = { ...next[idx] };
+		const key = item.summary ? 'summary' : 'content';
+		item[key] = [{ type: 'text', text }];
+		next[idx] = item;
+		output = next;
+		onChange(output);
+	}
+
 	function deleteIndices(indices: number[]) {
 		const rm = new Set(indices);
 		output = output.filter((_: any, i: number) => !rm.has(i));
@@ -161,14 +178,18 @@
 	}
 
 	function resizeEl(el: HTMLTextAreaElement) {
+		const c = document.getElementById('messages-container');
+		const s = c?.scrollTop;
 		el.style.height = '';
 		el.style.height = `${el.scrollHeight}px`;
+		if (c && s !== undefined) c.scrollTop = s;
 	}
 
 	function autoResize(e: Event) {
 		resizeEl(e.target as HTMLTextAreaElement);
 	}
 
+	/** Svelte action: auto-expand textarea to fit content on mount */
 	function fitContent(el: HTMLTextAreaElement) {
 		resizeEl(el);
 	}
@@ -177,6 +198,8 @@
 		switch (di.type) {
 			case 'message':
 				return 'Text';
+			case 'reasoning':
+				return 'Thought';
 			case 'function_call':
 				return di.item.name ?? 'Tool';
 			default:
@@ -185,41 +208,33 @@
 	}
 </script>
 
-<div class="w-full">
-	<!-- View mode tabs -->
-	<div class="flex justify-end gap-3 text-[11px] font-medium {viewMode === 'json' ? 'mb-1.5' : ''}">
+<div class="w-full relative">
+	<!-- Mode toggle -->
+	<div class="absolute -top-0.5 right-0.5 z-10">
 		<button
-			class="pb-0.5 transition-colors duration-100
-				{viewMode === 'visual'
-					? 'text-gray-700 dark:text-gray-200 border-b border-gray-400 dark:border-gray-400'
-					: 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}"
-			onclick={() => { if (viewMode === 'json') switchToVisual(); }}
-		>Rich</button>
-		<button
-			class="pb-0.5 transition-colors duration-100
-				{viewMode === 'json'
-					? 'text-gray-700 dark:text-gray-200 border-b border-gray-400 dark:border-gray-400'
-					: 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}"
-			onclick={() => { if (viewMode === 'visual') switchToJson(); }}
-		>JSON</button>
+			class="text-xs px-2 py-0.5 rounded-full transition-all text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200/50 dark:hover:bg-gray-700/50"
+			onclick={() => (viewMode === 'visual' ? switchToJson() : switchToVisual())}
+		>
+			{viewMode === 'visual' ? 'Visual' : 'JSON'}
+		</button>
 	</div>
 
 	{#if viewMode === 'json'}
 		<div
 			bind:this={cmContainer}
-			class="w-full rounded-xl overflow-hidden border border-gray-100 dark:border-white/8"
+			class="w-full rounded-2xl overflow-hidden border border-gray-100 dark:border-white/8"
 		></div>
 		{#if jsonError}
 			<div class="text-xs text-red-500 mt-1.5 px-1">{jsonError}</div>
 		{/if}
 	{:else}
-		<!-- Visual editor -->
+		<!-- Visual editor: playground-style rows -->
 		<div class="space-y-2 p-2 pt-3">
 			{#each displayItems as di}
 				<div class="flex gap-2 group">
-					<!-- Type label -->
+					<!-- Role label -->
 					<div class="flex items-start pt-1.5">
-						<div class="text-[10px] font-semibold uppercase tracking-wide min-w-[3.5rem] text-gray-400 dark:text-gray-500">
+						<div class="text-[11px] font-semibold uppercase tracking-wide min-w-[4.5rem] text-gray-400 dark:text-gray-500">
 							{getItemLabel(di)}
 						</div>
 					</div>
@@ -229,22 +244,34 @@
 						{#if di.type === 'message'}
 							<textarea
 								use:fitContent
-								class="w-full bg-transparent outline-none resize-none overflow-hidden text-[13px] p-1.5 rounded-lg leading-relaxed"
+								class="w-full bg-transparent outline-none resize-none overflow-hidden text-sm p-1.5 rounded-lg"
 								value={getMessageText(di.item)}
 								oninput={(e) => {
-									updateMessageText(di.index, (e.target as HTMLTextAreaElement).value);
+									updateMessageText(di.indices[0], (e.target as HTMLTextAreaElement).value);
 									autoResize(e);
 								}}
 								placeholder="Message text..."
 								rows="1"
 							></textarea>
+						{:else if di.type === 'reasoning'}
+							<textarea
+								use:fitContent
+								class="w-full bg-transparent outline-none resize-none overflow-hidden text-sm text-gray-500 dark:text-gray-400 p-1.5 rounded-lg"
+								value={getReasoningText(di.item)}
+								oninput={(e) => {
+									updateReasoningText(di.indices[0], (e.target as HTMLTextAreaElement).value);
+									autoResize(e);
+								}}
+								placeholder="Reasoning text..."
+								rows="1"
+							></textarea>
 						{:else if di.type === 'function_call'}
-							<div class="text-[12px] p-1.5 text-gray-500 dark:text-gray-400">
+							<div class="text-sm p-1.5 text-gray-500 dark:text-gray-400">
 								{#if di.item.arguments}
-									<pre class="text-[11px] font-mono whitespace-pre-wrap overflow-x-auto pb-0.5">{formatArgs(di.item.arguments)}</pre>
+									<pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto pb-0.5">{formatArgs(di.item.arguments)}</pre>
 								{/if}
 								{#if di.outputItem}
-									<pre class="text-[11px] font-mono whitespace-pre-wrap overflow-x-auto mt-1 max-h-32 overflow-y-auto text-gray-400 dark:text-gray-600">{di.outputItem.output}</pre>
+									<pre class="text-xs font-mono whitespace-pre-wrap overflow-x-auto mt-1 max-h-32 overflow-y-auto">{JSON.stringify(di.outputItem.output, null, 2)}</pre>
 								{/if}
 							</div>
 						{/if}
@@ -254,13 +281,9 @@
 					<div class="pt-1.5">
 						<button
 							class="invisible group-hover:visible p-1 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition rounded-lg"
-							onclick={() => {
-								const indices = [di.index];
-								if (di.outputIndex !== undefined) indices.push(di.outputIndex);
-								deleteIndices(indices);
-							}}
+							onclick={() => deleteIndices(di.indices)}
 						>
-							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-3.5 h-3.5">
+							<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor" class="w-4 h-4">
 								<path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
 							</svg>
 						</button>
@@ -269,7 +292,7 @@
 			{/each}
 
 			{#if displayItems.length === 0}
-				<div class="text-[12px] text-gray-400 dark:text-gray-500 italic px-1">
+				<div class="text-sm text-gray-400 dark:text-gray-500 italic px-1">
 					No output items
 				</div>
 			{/if}
