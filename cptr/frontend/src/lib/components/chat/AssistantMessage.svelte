@@ -126,23 +126,31 @@
 		}, 1500);
 	}
 
+	/** Shorten a file path to just the basename for compact display */
+	function shortPath(p: string | undefined): string {
+		if (!p) return '?';
+		const parts = p.split('/').filter(Boolean);
+		if (parts.length === 0) return p;
+		return parts[parts.length - 1];
+	}
+
 	/** Human-readable label for a tool call */
 	function toolLabel(name: string, args: any): string {
 		switch (name) {
 			case 'read_file': {
 				const range = args.start_line ? ` L${args.start_line}–${args.end_line || 'end'}` : '';
-				return `Read ${args.path || '?'}${range}`;
+				return `Read ${shortPath(args.path)}${range}`;
 			}
 			case 'edit_file':
-				return `Edit ${args.path || '?'}`;
+				return `Edit ${shortPath(args.path)}`;
 			case 'multi_edit_file':
-				return `Multi-edit ${args.path || '?'}`;
+				return `Multi-edit ${shortPath(args.path)}`;
 			case 'create_file':
-				return `Create ${args.path || '?'}`;
+				return `Create ${shortPath(args.path)}`;
 			case 'write_file':
-				return `Write ${args.path || '?'}`;
+				return `Write ${shortPath(args.path)}`;
 			case 'list_directory':
-				return `List ${args.path || '.'}${args.recursive ? ' (recursive)' : ''}`;
+				return `List ${shortPath(args.path)}${args.recursive ? ' (recursive)' : ''}`;
 			case 'search_files': {
 				const scope = args.include ? ` in ${args.include}` : '';
 				return `Search "${args.query || '?'}"${scope}`;
@@ -371,15 +379,15 @@
 						{@const isGroupOpen = expandedGroups.has(groupIdx)}
 						{@const hasPendingApproval = calls.some((c: any) => c.status === 'pending')}
 
-						<div class="w-full">
+						<div class="w-full min-w-0">
 							<!-- Group header -->
 							<button
-								class="w-fit text-left text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer"
+								class="w-full min-w-0 text-left text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer"
 								aria-label="Toggle tool calls"
 								aria-expanded={isGroupOpen}
 								onclick={() => toggleGroupExpanded(groupIdx)}
 							>
-								<div class="flex items-center gap-1.5 text-sm {hasPending ? 'shimmer' : ''}">
+								<div class="flex items-center gap-1.5 text-sm min-w-0 {hasPending ? 'shimmer' : ''}">
 									<!-- Status icon -->
 									{#if hasPending}
 										<div class="flex justify-center text-center">
@@ -465,7 +473,7 @@
 									{/if}
 
 									<!-- Summary text -->
-									<div class="flex-1 line-clamp-1">
+									<div class="flex-1 min-w-0 line-clamp-1">
 										<span class="text-gray-600 dark:text-gray-300"
 											>{hasPending ? 'Exploring' : 'Explored'}</span
 										>
@@ -513,14 +521,14 @@
 											{@const isExpanded = expandedCalls.has(callId)}
 											{@const pairedOutput = outputs.get(item.call_id)}
 
-											<div class="w-full">
+											<div class="w-full min-w-0">
 												<!-- Individual tool call row -->
 												<button
-													class="w-fit text-left text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer"
+													class="w-full min-w-0 text-left text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition cursor-pointer"
 													onclick={() => toggleCallExpanded(callId)}
 												>
 													<div
-														class="flex items-center gap-1.5 text-sm {isExecuting ? 'shimmer' : ''}"
+														class="flex items-center gap-1.5 text-sm min-w-0 {isExecuting ? 'shimmer' : ''}"
 													>
 														<!-- Status icon -->
 														{#if isExecuting}
@@ -607,7 +615,7 @@
 														{/if}
 
 														<!-- Label -->
-														<div class="flex-1 line-clamp-1">
+														<div class="flex-1 min-w-0 line-clamp-1">
 															<span class="font-normal">{toolLabel(toolName, args)}</span>
 														</div>
 
@@ -664,7 +672,7 @@
 												{#if isExpanded}
 													<div transition:slide={{ duration: 300, easing: quintOut, axis: 'y' }}>
 														<div
-															class="border border-gray-50 dark:border-gray-850/30 rounded-2xl my-1.5 p-3 space-y-3"
+															class="border border-gray-50 dark:border-gray-850/30 rounded-2xl my-1.5 p-3 space-y-3 overflow-hidden"
 														>
 															<!-- Input section -->
 															{#if Object.keys(args).length > 0}
@@ -709,7 +717,7 @@
 																		{/if}
 																	{:else if toolName === 'run_command'}
 																		<code
-																			class="block text-xs font-mono text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded-lg px-2.5 py-1.5"
+																			class="block text-xs font-mono text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded-lg px-2.5 py-1.5 overflow-x-auto break-all whitespace-pre-wrap"
 																			>{args.command}</code
 																		>
 																	{:else}
@@ -740,7 +748,7 @@
 																	>
 																		Output
 																	</div>
-																	<div class="w-full max-w-none">
+																	<div class="w-full min-w-0 overflow-hidden">
 																		<pre
 																			class="text-xs text-gray-600 dark:text-gray-300 whitespace-pre-wrap break-words font-mono max-h-64 overflow-auto leading-relaxed">{pairedOutput
 																				.output.length > 10000
@@ -770,7 +778,7 @@
 								<div class="mt-1 space-y-0.5">
 									{#each calls.filter((c: any) => c.status === 'pending') as item}
 										<div class="flex items-center gap-2 py-1 px-1">
-											<span class="text-xs text-gray-500 dark:text-gray-400 flex-1 line-clamp-1"
+											<span class="text-xs text-gray-500 dark:text-gray-400 flex-1 min-w-0 line-clamp-1"
 												>{toolLabel(item.name, item.arguments || {})}</span
 											>
 											<span class="flex gap-1 shrink-0">
