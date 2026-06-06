@@ -924,7 +924,7 @@
 	}
 
 	.state.error {
-		color: #ef4444;
+		color: var(--color-gray-400);
 		font-size: 13px;
 	}
 
