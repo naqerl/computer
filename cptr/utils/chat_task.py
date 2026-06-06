@@ -16,6 +16,7 @@ from cptr.models import Chat, ChatMessage, Config
 from cptr.socket.main import emit_to_user
 from cptr.utils.ai import (
     ChatCompletionForm,
+    chat_completion,
     stream_anthropic,
     stream_openai_completions,
     stream_openai_responses,
@@ -24,6 +25,7 @@ from cptr.utils.config import _get_jwt_secret, now_ms
 from cptr.utils.crypto import decrypt_key
 from cptr.utils.tools import TOOLS, execute_tool, get_tool_list
 from cptr.utils.chat_export import export_chat_to_file
+from cptr.utils.json_parser import extract_json
 
 logger = logging.getLogger(__name__)
 
@@ -269,6 +271,66 @@ def _load_system_prompt(workspace: str) -> str:
 
     return base
 
+
+
+# ── Title generation ────────────────────────────────────────
+
+
+TITLE_PROMPT = (
+    "Generate a concise title (max 8 words) for this conversation based on the user's message. "
+    "Respond with ONLY a JSON object: {\"title\": \"Your Title Here\"}. "
+    "Do not include quotes around the JSON. Do not explain."
+)
+
+
+async def generate_chat_title(
+    chat_id: str,
+    user_id: str,
+    connection: dict,
+    model: str,
+    user_message: str,
+):
+    """Generate a proper title for a new chat via a lightweight LLM call.
+
+    Uses the shared chat_completion() helper from ai.py.
+    On success, updates the DB and emits a socket event so the frontend
+    updates the tab label in real time.
+    """
+    provider = connection["provider"]
+    api_key = decrypt_key(connection.get("api_key", ""), _get_jwt_secret())
+    base_url = connection.get("base_url") or _default_base_url(provider)
+    api_type = connection.get("api_type", "chat_completions")
+
+    # Truncate very long messages to keep the prompt small
+    truncated = user_message[:200].strip()
+    if len(user_message) > 200:
+        truncated += "..."
+
+    try:
+        text = await chat_completion(
+            provider=provider,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            messages=[{"role": "user", "content": truncated}],
+            system=TITLE_PROMPT,
+            max_tokens=50,
+            api_type=api_type,
+        )
+
+        # Parse the JSON title
+        parsed = extract_json(text)
+        title = (parsed.get("title", "") if isinstance(parsed, dict) else "").strip()
+        if not title:
+            return
+
+        # Persist and notify
+        await Chat.update_title(chat_id, title, now_ms())
+        await emit_to_user(user_id, {"chat_id": chat_id, "title": title})
+        logger.info("[title] Generated title for chat %s: %s", chat_id[:8], title)
+
+    except Exception:
+        logger.debug("[title] Failed to generate title for chat %s", chat_id[:8], exc_info=True)
 
 
 # ── Message history ─────────────────────────────────────────
@@ -624,6 +686,25 @@ async def run_chat_task(
             await export_chat_to_file(chat_id)
         except Exception:
             logger.exception(f"Failed to export chat {chat_id}")
+        # Generate a proper title if the chat still has the auto-truncated fallback
+        try:
+            chat_obj = await Chat.get_by_id(chat_id)
+            if chat_obj:
+                all_msgs = await ChatMessage.get_all_by_chat(chat_id)
+                first_user = next(
+                    (m for m in all_msgs if m.role == "user" and not (m.meta and m.meta.get("queued"))),
+                    None,
+                )
+                if first_user:
+                    # The router sets title = content[:50] on creation.
+                    # Only generate if the title still matches that fallback.
+                    fallback = first_user.content[:50].strip() or "New Chat"
+                    if chat_obj.title == fallback:
+                        await generate_chat_title(
+                            chat_id, user_id, connection, model, first_user.content
+                        )
+        except Exception:
+            logger.debug("[title] Error in title generation for chat %s", chat_id[:8], exc_info=True)
         # Process any queued follow-up messages
         try:
             await _process_queue(chat_id, user_id, workspace)

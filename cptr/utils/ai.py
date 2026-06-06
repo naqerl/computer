@@ -1,7 +1,10 @@
-"""Provider streaming functions: raw httpx SSE.
+"""Provider streaming and completion functions: raw httpx.
 
-Each function takes a ChatCompletionForm + url + key.
+Each streaming function takes a ChatCompletionForm + url + key.
 All yield normalized events: text_delta, tool_call, usage, done.
+
+chat_completion() provides a simple non-streaming call for lightweight tasks
+(title generation, summarization, etc.).
 """
 
 from __future__ import annotations
@@ -24,6 +27,86 @@ class ChatCompletionForm(BaseModel):
     instructions: str = ""
     tools: List[Dict] = []
 
+
+# ── Non-streaming completion ────────────────────────────────
+
+
+async def chat_completion(
+    provider: str,
+    base_url: str,
+    api_key: str,
+    model: str,
+    messages: list[dict],
+    system: str = "",
+    max_tokens: int = 100,
+    api_type: str = "chat_completions",
+) -> str:
+    """Simple non-streaming chat completion. Returns the text content.
+
+    Works with Anthropic, OpenAI Chat Completions, and OpenAI Responses API.
+    Useful for lightweight tasks like title/summary generation.
+    """
+    async with httpx.AsyncClient(timeout=httpx.Timeout(15)) as client:
+        if provider == "anthropic":
+            body: dict = {
+                "model": model,
+                "messages": messages,
+                "max_tokens": max_tokens,
+            }
+            if system:
+                body["system"] = system
+            resp = await client.post(
+                f"{base_url}/messages",
+                json=body,
+                headers={
+                    "x-api-key": api_key,
+                    "anthropic-version": "2023-06-01",
+                },
+            )
+        elif api_type == "responses":
+            # OpenAI Responses API
+            body_r: dict = {
+                "model": model,
+                "input": messages,
+                "max_output_tokens": max_tokens,
+            }
+            if system:
+                body_r["instructions"] = system
+            resp = await client.post(
+                f"{base_url}/responses",
+                json=body_r,
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        else:
+            # OpenAI Chat Completions (default)
+            all_messages = messages[:]
+            if system:
+                all_messages.insert(0, {"role": "system", "content": system})
+            resp = await client.post(
+                f"{base_url}/chat/completions",
+                json={
+                    "model": model,
+                    "messages": all_messages,
+                    "max_completion_tokens": max_tokens,
+                },
+                headers={"Authorization": f"Bearer {api_key}"},
+            )
+        if resp.status_code >= 400:
+            logger.debug("[chat_completion] %s %s → %s: %s", provider, model, resp.status_code, resp.text[:500])
+        resp.raise_for_status()
+        data = resp.json()
+
+    if provider == "anthropic":
+        return data.get("content", [{}])[0].get("text", "")
+    if api_type == "responses":
+        # Responses API: output is a list of items
+        for item in data.get("output", []):
+            if item.get("type") == "message":
+                for c in item.get("content", []):
+                    if c.get("type") == "output_text":
+                        return c.get("text", "")
+        return ""
+    return data.get("choices", [{}])[0].get("message", {}).get("content", "")
 
 # ── Anthropic ────────────────────────────────────────────────
 
