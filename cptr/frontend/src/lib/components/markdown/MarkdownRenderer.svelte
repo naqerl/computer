@@ -41,6 +41,6 @@
 	});
 </script>
 
-<div class="prose prose-sm dark:prose-invert max-w-none break-words leading-relaxed prose-p:my-2 prose-p:leading-relaxed prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold prose-headings:leading-snug prose-strong:font-semibold prose-th:font-semibold prose-code:before:content-none prose-code:after:content-none prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-3 prose-blockquote:my-3 prose-hr:my-4 prose-img:my-2 prose-table:my-3 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
+<div class="prose prose-sm dark:prose-invert max-w-none break-words leading-relaxed prose-p:my-2 prose-p:leading-relaxed prose-headings:mt-4 prose-headings:mb-2 prose-headings:font-semibold prose-headings:leading-snug prose-strong:font-semibold prose-code:before:content-none prose-code:after:content-none prose-ul:my-2 prose-ol:my-2 prose-li:my-0.5 prose-pre:my-3 prose-blockquote:my-3 prose-hr:my-4 prose-img:my-2 [&>:first-child]:mt-0 [&>:last-child]:mb-0">
 	<BlockRenderer {tokens} />
 </div>
