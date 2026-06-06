@@ -70,6 +70,8 @@
 	"files.folder": "폴더",
 	"files.file": "파일",
 	"files.clickToPreview": "{{process}} — 클릭하여 미리보기",
+	"files.showHidden": "닷파일 표시",
+	"files.hideHidden": "닷파일 숨기기",
 	"files.failedToLoad": "디렉터리 로드 실패",
 
 	"quickOpen.searchFiles": "파일 검색...",
@@ -89,6 +91,10 @@
 	"general.dark": "다크",
 	"general.system": "시스템",
 	"general.language": "언어",
+
+	"general.tools": "도구",
+	"general.autoApproveTools": "모든 도구 호출 자동 승인",
+	"general.autoApproveToolsDesc": "도구 호출(쓰기, 실행 등)을 확인 없이 자동으로 허용합니다",
 
 	"account.title": "계정",
 	"account.displayName": "표시 이름",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "사용자 이름을 입력하세요",
 	"admin.minCharsPassword": "최소 6자",
 
+	"admin.connections": "연결",
+
+	"connections.loadError": "연결을 불러오지 못했습니다",
+	"connections.fieldsRequired": "기본 URL과 API 키가 필요합니다",
+	"connections.added": "연결이 추가되었습니다",
+	"connections.addError": "연결 추가에 실패했습니다",
+	"connections.deleted": "연결이 삭제되었습니다",
+	"connections.deleteError": "연결 삭제에 실패했습니다",
+	"connections.verified": "연결됨",
+	"connections.failed": "연결 실패",
+	"connections.empty": "구성된 연결이 없습니다",
+	"connections.name": "연결 이름",
+	"connections.apiKey": "API 키",
+	"connections.baseUrl": "기본 URL",
+	"connections.prefixId": "접두사 ID",
+	"connections.models": "모델(쉼표로 구분, 선택 사항)",
+	"connections.cancel": "취소",
+	"connections.add": "추가",
+	"connections.verify": "확인",
+
+	"bar.newChat": "새 채팅",
+
 	"home.start": "시작",
 	"home.openFolder": "폴더 열기...",
 	"home.recent": "최근",
@@ -215,5 +243,20 @@
 	"system.memory": "메모리",
 	"system.disk": "디스크",
 	"system.cores": "{{count}} 코어",
-	"system.process": "프로세스"
+	"system.process": "프로세스",
+
+	"admin.web": "웹",
+	"admin.webEnabled": "웹 액세스 활성화",
+	"admin.webEnabledHint": "AI가 웹을 검색하고 URL을 가져올 수 있습니다.",
+	"admin.webDisabledHint": "웹 검색 및 URL 가져오기가 비활성화되어 있습니다.",
+	"admin.webSearchProvider": "검색 제공자",
+	"admin.webProviderAuto": "자동",
+	"admin.webAutoHint": "사용 가능한 최적의 제공자를 자동으로 선택합니다.",
+	"admin.webExaKey": "Exa API 키",
+	"admin.webExaHint": "exa.ai에서 API 키를 받으세요",
+	"admin.webTavilyKey": "Tavily API 키",
+	"admin.webTavilyHint": "tavily.com에서 API 키를 받으세요",
+	"admin.webBraveKey": "Brave API 키",
+	"admin.webBraveHint": "brave.com/search/api에서 API 키를 받으세요",
+	"admin.webDuckDuckGoNote": "DuckDuckGo는 API 키가 필요 없습니다(대체)."
 }

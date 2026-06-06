@@ -70,6 +70,8 @@
 	"files.folder": "フォルダ",
 	"files.file": "ファイル",
 	"files.clickToPreview": "{{process}} — クリックでプレビュー",
+	"files.showHidden": "ドットファイルを表示",
+	"files.hideHidden": "ドットファイルを非表示",
 	"files.failedToLoad": "ディレクトリの読み込みに失敗しました",
 
 	"quickOpen.searchFiles": "ファイルを検索...",
@@ -89,6 +91,10 @@
 	"general.dark": "ダーク",
 	"general.system": "システム",
 	"general.language": "言語",
+
+	"general.tools": "ツール",
+	"general.autoApproveTools": "すべてのツール呼び出しを自動承認",
+	"general.autoApproveToolsDesc": "ツール呼び出し（書き込み、実行など）を確認なしで自動的に許可します",
 
 	"account.title": "アカウント",
 	"account.displayName": "表示名",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "ユーザー名を入力してください",
 	"admin.minCharsPassword": "6文字以上",
 
+	"admin.connections": "接続",
+
+	"connections.loadError": "接続の読み込みに失敗しました",
+	"connections.fieldsRequired": "ベースURLとAPIキーが必要です",
+	"connections.added": "接続を追加しました",
+	"connections.addError": "接続の追加に失敗しました",
+	"connections.deleted": "接続を削除しました",
+	"connections.deleteError": "接続の削除に失敗しました",
+	"connections.verified": "接続済み",
+	"connections.failed": "接続に失敗しました",
+	"connections.empty": "設定済みの接続はありません",
+	"connections.name": "接続名",
+	"connections.apiKey": "APIキー",
+	"connections.baseUrl": "ベースURL",
+	"connections.prefixId": "プレフィックスID",
+	"connections.models": "モデル（カンマ区切り、任意）",
+	"connections.cancel": "キャンセル",
+	"connections.add": "追加",
+	"connections.verify": "確認",
+
+	"bar.newChat": "新しいチャット",
+
 	"home.start": "スタート",
 	"home.openFolder": "フォルダを開く...",
 	"home.recent": "最近",
@@ -215,5 +243,20 @@
 	"system.memory": "メモリ",
 	"system.disk": "ディスク",
 	"system.cores": "{{count}} コア",
-	"system.process": "プロセス"
+	"system.process": "プロセス",
+
+	"admin.web": "Web",
+	"admin.webEnabled": "Webアクセスを有効にする",
+	"admin.webEnabledHint": "AIがWebを検索し、URLを取得できます。",
+	"admin.webDisabledHint": "Web検索とURL取得は無効です。",
+	"admin.webSearchProvider": "検索プロバイダー",
+	"admin.webProviderAuto": "自動",
+	"admin.webAutoHint": "利用可能な最適なプロバイダーを自動的に選択します。",
+	"admin.webExaKey": "Exa APIキー",
+	"admin.webExaHint": "exa.aiでAPIキーを取得してください",
+	"admin.webTavilyKey": "Tavily APIキー",
+	"admin.webTavilyHint": "tavily.comでAPIキーを取得してください",
+	"admin.webBraveKey": "Brave APIキー",
+	"admin.webBraveHint": "brave.com/search/apiでAPIキーを取得してください",
+	"admin.webDuckDuckGoNote": "DuckDuckGoはAPIキー不要です（フォールバック）。"
 }

@@ -70,6 +70,8 @@
 	"files.folder": "資料夾",
 	"files.file": "檔案",
 	"files.clickToPreview": "{{process}} — 點擊預覽",
+	"files.showHidden": "顯示點檔",
+	"files.hideHidden": "隱藏點檔",
 	"files.failedToLoad": "載入目錄失敗",
 
 	"quickOpen.searchFiles": "搜尋檔案...",
@@ -89,6 +91,10 @@
 	"general.dark": "深色",
 	"general.system": "跟隨系統",
 	"general.language": "語言",
+
+	"general.tools": "工具",
+	"general.autoApproveTools": "自動核准所有工具呼叫",
+	"general.autoApproveToolsDesc": "自動允許工具呼叫（寫入、執行等），無需確認",
 
 	"account.title": "帳號",
 	"account.displayName": "顯示名稱",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "請輸入使用者名稱",
 	"admin.minCharsPassword": "至少6個字元",
 
+	"admin.connections": "連線",
+
+	"connections.loadError": "無法載入連線",
+	"connections.fieldsRequired": "需要基礎 URL 和 API 金鑰",
+	"connections.added": "已新增連線",
+	"connections.addError": "無法新增連線",
+	"connections.deleted": "已刪除連線",
+	"connections.deleteError": "無法刪除連線",
+	"connections.verified": "已連線",
+	"connections.failed": "連線失敗",
+	"connections.empty": "尚未設定連線",
+	"connections.name": "連線名稱",
+	"connections.apiKey": "API 金鑰",
+	"connections.baseUrl": "基礎 URL",
+	"connections.prefixId": "前綴 ID",
+	"connections.models": "模型（以逗號分隔，可選）",
+	"connections.cancel": "取消",
+	"connections.add": "新增",
+	"connections.verify": "驗證",
+
+	"bar.newChat": "新增聊天",
+
 	"home.start": "開始",
 	"home.openFolder": "開啟資料夾...",
 	"home.recent": "最近",
@@ -215,5 +243,20 @@
 	"system.memory": "記憶體",
 	"system.disk": "磁碟",
 	"system.cores": "{{count}} 核心",
-	"system.process": "處理程序"
+	"system.process": "處理程序",
+
+	"admin.web": "網頁",
+	"admin.webEnabled": "啟用網頁存取",
+	"admin.webEnabledHint": "AI 可以搜尋網頁並擷取 URL。",
+	"admin.webDisabledHint": "網頁搜尋與 URL 擷取已停用。",
+	"admin.webSearchProvider": "搜尋提供者",
+	"admin.webProviderAuto": "自動",
+	"admin.webAutoHint": "自動選擇最佳可用提供者。",
+	"admin.webExaKey": "Exa API 金鑰",
+	"admin.webExaHint": "在 exa.ai 取得你的 API 金鑰",
+	"admin.webTavilyKey": "Tavily API 金鑰",
+	"admin.webTavilyHint": "在 tavily.com 取得你的 API 金鑰",
+	"admin.webBraveKey": "Brave API 金鑰",
+	"admin.webBraveHint": "在 brave.com/search/api 取得你的 API 金鑰",
+	"admin.webDuckDuckGoNote": "DuckDuckGo 不需要 API 金鑰（備用）。"
 }

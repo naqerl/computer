@@ -70,6 +70,8 @@
 	"files.folder": "папку",
 	"files.file": "файл",
 	"files.clickToPreview": "{{process}} — нажмите для предпросмотра",
+	"files.showHidden": "Показать dotfiles",
+	"files.hideHidden": "Скрыть dotfiles",
 	"files.failedToLoad": "Не удалось загрузить каталог",
 
 	"quickOpen.searchFiles": "Поиск файлов...",
@@ -89,6 +91,10 @@
 	"general.dark": "Тёмная",
 	"general.system": "Системная",
 	"general.language": "Язык",
+
+	"general.tools": "Инструменты",
+	"general.autoApproveTools": "Автоматически одобрять все вызовы инструментов",
+	"general.autoApproveToolsDesc": "Автоматически разрешать вызовы инструментов (запись, запуск и т. д.) без подтверждения",
 
 	"account.title": "Аккаунт",
 	"account.displayName": "Отображаемое имя",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "Введите имя пользователя",
 	"admin.minCharsPassword": "Минимум 6 символов",
 
+	"admin.connections": "Подключения",
+
+	"connections.loadError": "Не удалось загрузить подключения",
+	"connections.fieldsRequired": "Требуются базовый URL и API-ключ",
+	"connections.added": "Подключение добавлено",
+	"connections.addError": "Не удалось добавить подключение",
+	"connections.deleted": "Подключение удалено",
+	"connections.deleteError": "Не удалось удалить подключение",
+	"connections.verified": "Подключено",
+	"connections.failed": "Ошибка подключения",
+	"connections.empty": "Подключения не настроены",
+	"connections.name": "Название подключения",
+	"connections.apiKey": "API-ключ",
+	"connections.baseUrl": "Базовый URL",
+	"connections.prefixId": "ID префикса",
+	"connections.models": "Модели (через запятую, необязательно)",
+	"connections.cancel": "Отмена",
+	"connections.add": "Добавить",
+	"connections.verify": "Проверить",
+
+	"bar.newChat": "Новый чат",
+
 	"home.start": "Начало",
 	"home.openFolder": "Открыть папку...",
 	"home.recent": "Недавние",
@@ -215,5 +243,20 @@
 	"system.memory": "Память",
 	"system.disk": "Диск",
 	"system.cores": "{{count}} ядер",
-	"system.process": "ПРОЦЕСС"
+	"system.process": "ПРОЦЕСС",
+
+	"admin.web": "Веб",
+	"admin.webEnabled": "Включить доступ к вебу",
+	"admin.webEnabledHint": "ИИ может искать в вебе и получать URL-адреса.",
+	"admin.webDisabledHint": "Веб-поиск и получение URL-адресов отключены.",
+	"admin.webSearchProvider": "Поставщик поиска",
+	"admin.webProviderAuto": "Авто",
+	"admin.webAutoHint": "Автоматически выбирает лучшего доступного поставщика.",
+	"admin.webExaKey": "API-ключ Exa",
+	"admin.webExaHint": "Получите API-ключ на exa.ai",
+	"admin.webTavilyKey": "API-ключ Tavily",
+	"admin.webTavilyHint": "Получите API-ключ на tavily.com",
+	"admin.webBraveKey": "API-ключ Brave",
+	"admin.webBraveHint": "Получите API-ключ на brave.com/search/api",
+	"admin.webDuckDuckGoNote": "DuckDuckGo не требует API-ключа (резервный вариант)."
 }

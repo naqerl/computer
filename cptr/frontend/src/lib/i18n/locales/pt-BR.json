@@ -70,6 +70,8 @@
 	"files.folder": "pasta",
 	"files.file": "arquivo",
 	"files.clickToPreview": "{{process}} — clique para visualizar",
+	"files.showHidden": "Mostrar dotfiles",
+	"files.hideHidden": "Ocultar dotfiles",
 	"files.failedToLoad": "Falha ao carregar diretório",
 
 	"quickOpen.searchFiles": "Buscar arquivos...",
@@ -89,6 +91,10 @@
 	"general.dark": "Escuro",
 	"general.system": "Sistema",
 	"general.language": "Idioma",
+
+	"general.tools": "Ferramentas",
+	"general.autoApproveTools": "Aprovar automaticamente todas as chamadas de ferramentas",
+	"general.autoApproveToolsDesc": "Permitir automaticamente chamadas de ferramentas (escrever, executar etc.) sem confirmação",
 
 	"account.title": "Conta",
 	"account.displayName": "Nome de exibição",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "Nome de usuário obrigatório",
 	"admin.minCharsPassword": "Mínimo de 6 caracteres",
 
+	"admin.connections": "Conexões",
+
+	"connections.loadError": "Falha ao carregar conexões",
+	"connections.fieldsRequired": "URL base e chave de API obrigatórias",
+	"connections.added": "Conexão adicionada",
+	"connections.addError": "Falha ao adicionar conexão",
+	"connections.deleted": "Conexão excluída",
+	"connections.deleteError": "Falha ao excluir conexão",
+	"connections.verified": "Conectado",
+	"connections.failed": "Falha na conexão",
+	"connections.empty": "Nenhuma conexão configurada",
+	"connections.name": "Nome da conexão",
+	"connections.apiKey": "Chave de API",
+	"connections.baseUrl": "URL base",
+	"connections.prefixId": "ID de prefixo",
+	"connections.models": "Modelos (separados por vírgula, opcional)",
+	"connections.cancel": "Cancelar",
+	"connections.add": "Adicionar",
+	"connections.verify": "Verificar",
+
+	"bar.newChat": "Novo chat",
+
 	"home.start": "Início",
 	"home.openFolder": "Abrir pasta...",
 	"home.recent": "Recentes",
@@ -215,5 +243,20 @@
 	"system.memory": "Memória",
 	"system.disk": "Disco",
 	"system.cores": "{{count}} núcleos",
-	"system.process": "PROCESSO"
+	"system.process": "PROCESSO",
+
+	"admin.web": "Web",
+	"admin.webEnabled": "Ativar acesso à web",
+	"admin.webEnabledHint": "A IA pode pesquisar na web e buscar URLs.",
+	"admin.webDisabledHint": "A pesquisa na web e a busca de URLs estão desativadas.",
+	"admin.webSearchProvider": "Provedor de pesquisa",
+	"admin.webProviderAuto": "Automático",
+	"admin.webAutoHint": "Seleciona automaticamente o melhor provedor disponível.",
+	"admin.webExaKey": "Chave de API da Exa",
+	"admin.webExaHint": "Obtenha sua chave de API em exa.ai",
+	"admin.webTavilyKey": "Chave de API da Tavily",
+	"admin.webTavilyHint": "Obtenha sua chave de API em tavily.com",
+	"admin.webBraveKey": "Chave de API da Brave",
+	"admin.webBraveHint": "Obtenha sua chave de API em brave.com/search/api",
+	"admin.webDuckDuckGoNote": "DuckDuckGo não exige chave de API (fallback)."
 }

@@ -70,6 +70,8 @@
 	"files.folder": "carpeta",
 	"files.file": "archivo",
 	"files.clickToPreview": "{{process}} — clic para previsualizar",
+	"files.showHidden": "Mostrar dotfiles",
+	"files.hideHidden": "Ocultar dotfiles",
 	"files.failedToLoad": "Error al cargar el directorio",
 
 	"quickOpen.searchFiles": "Buscar archivos...",
@@ -89,6 +91,10 @@
 	"general.dark": "Oscuro",
 	"general.system": "Sistema",
 	"general.language": "Idioma",
+
+	"general.tools": "Herramientas",
+	"general.autoApproveTools": "Aprobar automáticamente todas las llamadas a herramientas",
+	"general.autoApproveToolsDesc": "Permitir automáticamente llamadas a herramientas (escribir, ejecutar, etc.) sin confirmación",
 
 	"account.title": "Cuenta",
 	"account.displayName": "Nombre para mostrar",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "Nombre de usuario requerido",
 	"admin.minCharsPassword": "Mínimo 6 caracteres",
 
+	"admin.connections": "Conexiones",
+
+	"connections.loadError": "Error al cargar conexiones",
+	"connections.fieldsRequired": "Se requieren la URL base y la clave de API",
+	"connections.added": "Conexión agregada",
+	"connections.addError": "Error al agregar la conexión",
+	"connections.deleted": "Conexión eliminada",
+	"connections.deleteError": "Error al eliminar la conexión",
+	"connections.verified": "Conectado",
+	"connections.failed": "Conexión fallida",
+	"connections.empty": "No hay conexiones configuradas",
+	"connections.name": "Nombre de la conexión",
+	"connections.apiKey": "Clave de API",
+	"connections.baseUrl": "URL base",
+	"connections.prefixId": "ID de prefijo",
+	"connections.models": "Modelos (separados por comas, opcional)",
+	"connections.cancel": "Cancelar",
+	"connections.add": "Agregar",
+	"connections.verify": "Verificar",
+
+	"bar.newChat": "Nuevo chat",
+
 	"home.start": "Inicio",
 	"home.openFolder": "Abrir carpeta...",
 	"home.recent": "Recientes",
@@ -215,5 +243,20 @@
 	"system.memory": "Memoria",
 	"system.disk": "Disco",
 	"system.cores": "{{count}} núcleos",
-	"system.process": "PROCESO"
+	"system.process": "PROCESO",
+
+	"admin.web": "Web",
+	"admin.webEnabled": "Habilitar acceso web",
+	"admin.webEnabledHint": "La IA puede buscar en la web y obtener URLs.",
+	"admin.webDisabledHint": "La búsqueda web y la obtención de URLs están deshabilitadas.",
+	"admin.webSearchProvider": "Proveedor de búsqueda",
+	"admin.webProviderAuto": "Automático",
+	"admin.webAutoHint": "Selecciona automáticamente el mejor proveedor disponible.",
+	"admin.webExaKey": "Clave de API de Exa",
+	"admin.webExaHint": "Obtén tu clave de API en exa.ai",
+	"admin.webTavilyKey": "Clave de API de Tavily",
+	"admin.webTavilyHint": "Obtén tu clave de API en tavily.com",
+	"admin.webBraveKey": "Clave de API de Brave",
+	"admin.webBraveHint": "Obtén tu clave de API en brave.com/search/api",
+	"admin.webDuckDuckGoNote": "DuckDuckGo no requiere clave de API (respaldo)."
 }

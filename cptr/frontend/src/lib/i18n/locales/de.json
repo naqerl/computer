@@ -70,6 +70,8 @@
 	"files.folder": "Ordner",
 	"files.file": "Datei",
 	"files.clickToPreview": "{{process}} — Klicken für Vorschau",
+	"files.showHidden": "Dotfiles anzeigen",
+	"files.hideHidden": "Dotfiles ausblenden",
 	"files.failedToLoad": "Verzeichnis konnte nicht geladen werden",
 
 	"quickOpen.searchFiles": "Dateien suchen...",
@@ -89,6 +91,10 @@
 	"general.dark": "Dunkel",
 	"general.system": "System",
 	"general.language": "Sprache",
+
+	"general.tools": "Tools",
+	"general.autoApproveTools": "Alle Tool-Aufrufe automatisch genehmigen",
+	"general.autoApproveToolsDesc": "Tool-Aufrufe (Schreiben, Ausführen usw.) automatisch ohne Bestätigung erlauben",
 
 	"account.title": "Konto",
 	"account.displayName": "Anzeigename",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "Benutzername erforderlich",
 	"admin.minCharsPassword": "Mindestens 6 Zeichen",
 
+	"admin.connections": "Verbindungen",
+
+	"connections.loadError": "Verbindungen konnten nicht geladen werden",
+	"connections.fieldsRequired": "Basis-URL und API-Schlüssel erforderlich",
+	"connections.added": "Verbindung hinzugefügt",
+	"connections.addError": "Verbindung konnte nicht hinzugefügt werden",
+	"connections.deleted": "Verbindung gelöscht",
+	"connections.deleteError": "Verbindung konnte nicht gelöscht werden",
+	"connections.verified": "Verbunden",
+	"connections.failed": "Verbindung fehlgeschlagen",
+	"connections.empty": "Keine Verbindungen konfiguriert",
+	"connections.name": "Verbindungsname",
+	"connections.apiKey": "API-Schlüssel",
+	"connections.baseUrl": "Basis-URL",
+	"connections.prefixId": "Präfix-ID",
+	"connections.models": "Modelle (durch Kommas getrennt, optional)",
+	"connections.cancel": "Abbrechen",
+	"connections.add": "Hinzufügen",
+	"connections.verify": "Prüfen",
+
+	"bar.newChat": "Neuer Chat",
+
 	"home.start": "Start",
 	"home.openFolder": "Ordner öffnen...",
 	"home.recent": "Zuletzt verwendet",
@@ -215,5 +243,20 @@
 	"system.memory": "Speicher",
 	"system.disk": "Festplatte",
 	"system.cores": "{{count}} Kerne",
-	"system.process": "PROZESS"
+	"system.process": "PROZESS",
+
+	"admin.web": "Web",
+	"admin.webEnabled": "Webzugriff aktivieren",
+	"admin.webEnabledHint": "KI kann das Web durchsuchen und URLs abrufen.",
+	"admin.webDisabledHint": "Websuche und URL-Abruf sind deaktiviert.",
+	"admin.webSearchProvider": "Suchanbieter",
+	"admin.webProviderAuto": "Automatisch",
+	"admin.webAutoHint": "Wählt automatisch den besten verfügbaren Anbieter aus.",
+	"admin.webExaKey": "Exa-API-Schlüssel",
+	"admin.webExaHint": "API-Schlüssel unter exa.ai erhalten",
+	"admin.webTavilyKey": "Tavily-API-Schlüssel",
+	"admin.webTavilyHint": "API-Schlüssel unter tavily.com erhalten",
+	"admin.webBraveKey": "Brave-API-Schlüssel",
+	"admin.webBraveHint": "API-Schlüssel unter brave.com/search/api erhalten",
+	"admin.webDuckDuckGoNote": "DuckDuckGo benötigt keinen API-Schlüssel (Fallback)."
 }

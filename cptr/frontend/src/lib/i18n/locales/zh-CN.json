@@ -70,6 +70,8 @@
 	"files.folder": "文件夹",
 	"files.file": "文件",
 	"files.clickToPreview": "{{process}} — 点击预览",
+	"files.showHidden": "显示点文件",
+	"files.hideHidden": "隐藏点文件",
 	"files.failedToLoad": "加载目录失败",
 
 	"quickOpen.searchFiles": "搜索文件...",
@@ -89,6 +91,10 @@
 	"general.dark": "深色",
 	"general.system": "跟随系统",
 	"general.language": "语言",
+
+	"general.tools": "工具",
+	"general.autoApproveTools": "自动批准所有工具调用",
+	"general.autoApproveToolsDesc": "自动允许工具调用（写入、运行等），无需确认",
 
 	"account.title": "账户",
 	"account.displayName": "显示名称",
@@ -186,6 +192,28 @@
 	"admin.usernameRequired": "请输入用户名",
 	"admin.minCharsPassword": "至少6个字符",
 
+	"admin.connections": "连接",
+
+	"connections.loadError": "无法加载连接",
+	"connections.fieldsRequired": "需要基础 URL 和 API 密钥",
+	"connections.added": "连接已添加",
+	"connections.addError": "无法添加连接",
+	"connections.deleted": "连接已删除",
+	"connections.deleteError": "无法删除连接",
+	"connections.verified": "已连接",
+	"connections.failed": "连接失败",
+	"connections.empty": "未配置连接",
+	"connections.name": "连接名称",
+	"connections.apiKey": "API 密钥",
+	"connections.baseUrl": "基础 URL",
+	"connections.prefixId": "前缀 ID",
+	"connections.models": "模型（逗号分隔，可选）",
+	"connections.cancel": "取消",
+	"connections.add": "添加",
+	"connections.verify": "验证",
+
+	"bar.newChat": "新建聊天",
+
 	"home.start": "开始",
 	"home.openFolder": "打开文件夹...",
 	"home.recent": "最近",
@@ -215,5 +243,20 @@
 	"system.memory": "内存",
 	"system.disk": "磁盘",
 	"system.cores": "{{count}} 核",
-	"system.process": "进程"
+	"system.process": "进程",
+
+	"admin.web": "网页",
+	"admin.webEnabled": "启用网页访问",
+	"admin.webEnabledHint": "AI 可以搜索网页并获取 URL。",
+	"admin.webDisabledHint": "网页搜索和 URL 获取已禁用。",
+	"admin.webSearchProvider": "搜索提供商",
+	"admin.webProviderAuto": "自动",
+	"admin.webAutoHint": "自动选择最佳可用提供商。",
+	"admin.webExaKey": "Exa API 密钥",
+	"admin.webExaHint": "在 exa.ai 获取你的 API 密钥",
+	"admin.webTavilyKey": "Tavily API 密钥",
+	"admin.webTavilyHint": "在 tavily.com 获取你的 API 密钥",
+	"admin.webBraveKey": "Brave API 密钥",
+	"admin.webBraveHint": "在 brave.com/search/api 获取你的 API 密钥",
+	"admin.webDuckDuckGoNote": "DuckDuckGo 不需要 API 密钥（备用）。"
 }
