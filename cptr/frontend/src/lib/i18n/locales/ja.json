@@ -258,5 +258,7 @@
 	"admin.webTavilyHint": "tavily.comでAPIキーを取得してください",
 	"admin.webBraveKey": "Brave APIキー",
 	"admin.webBraveHint": "brave.com/search/apiでAPIキーを取得してください",
-	"admin.webDuckDuckGoNote": "DuckDuckGoはAPIキー不要です（フォールバック）。"
+	"admin.webDuckDuckGoNote": "DuckDuckGoはAPIキー不要です（フォールバック）。",
+	"admin.webPerplexityKey": "Perplexity APIキー",
+	"admin.webPerplexityHint": "perplexity.ai でAPIキーを取得"
 }

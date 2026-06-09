@@ -1,10 +1,11 @@
 """Search dispatcher: picks provider based on config.
 
 Priority in auto mode:
-1. Exa      (EXA_API_KEY or web.exa_api_key)
-2. Tavily   (TAVILY_API_KEY or web.tavily_api_key)
-3. Brave    (BRAVE_API_KEY or web.brave_api_key)
-4. DuckDuckGo (zero-config fallback)
+1. Exa        (EXA_API_KEY or web.exa_api_key)
+2. Perplexity (PERPLEXITY_API_KEY or web.perplexity_api_key)
+3. Tavily     (TAVILY_API_KEY or web.tavily_api_key)
+4. Brave      (BRAVE_API_KEY or web.brave_api_key)
+5. DuckDuckGo (zero-config fallback)
 """
 
 from __future__ import annotations
@@ -40,7 +41,7 @@ async def _get_config(key: str) -> str:
 
 async def web_search_handler(query: str) -> str:
     """Search the web using the configured or best available provider."""
-    from cptr.utils.web import exa, tavily, brave, duckduckgo
+    from cptr.utils.web import exa, perplexity, tavily, brave, duckduckgo
 
     # Check if web access is disabled by admin
     enabled = await _get_config("web.enabled")
@@ -50,6 +51,7 @@ async def web_search_handler(query: str) -> str:
     provider = await _get_config("web.search_provider") or "auto"
 
     exa_key = await _get_key("EXA_API_KEY", "web.exa_api_key")
+    perplexity_key = await _get_key("PERPLEXITY_API_KEY", "web.perplexity_api_key")
     tavily_key = await _get_key("TAVILY_API_KEY", "web.tavily_api_key")
     brave_key = await _get_key("BRAVE_API_KEY", "web.brave_api_key")
 
@@ -60,6 +62,10 @@ async def web_search_handler(query: str) -> str:
                 if not exa_key:
                     return "Error: Exa API key not configured."
                 return await exa.search(query, exa_key)
+            elif provider == "perplexity":
+                if not perplexity_key:
+                    return "Error: Perplexity API key not configured."
+                return await perplexity.search(query, perplexity_key)
             elif provider == "tavily":
                 if not tavily_key:
                     return "Error: Tavily API key not configured."
@@ -80,6 +86,8 @@ async def web_search_handler(query: str) -> str:
     providers = []
     if exa_key:
         providers.append(("exa", lambda: exa.search(query, exa_key)))
+    if perplexity_key:
+        providers.append(("perplexity", lambda: perplexity.search(query, perplexity_key)))
     if tavily_key:
         providers.append(("tavily", lambda: tavily.search(query, tavily_key)))
     if brave_key:

@@ -258,5 +258,7 @@
 	"admin.webTavilyHint": "在 tavily.com 获取你的 API 密钥",
 	"admin.webBraveKey": "Brave API 密钥",
 	"admin.webBraveHint": "在 brave.com/search/api 获取你的 API 密钥",
-	"admin.webDuckDuckGoNote": "DuckDuckGo 不需要 API 密钥（备用）。"
+	"admin.webDuckDuckGoNote": "DuckDuckGo 不需要 API 密钥（备用）。",
+	"admin.webPerplexityKey": "Perplexity API 密钥",
+	"admin.webPerplexityHint": "在 perplexity.ai 获取你的 API 密钥"
 }

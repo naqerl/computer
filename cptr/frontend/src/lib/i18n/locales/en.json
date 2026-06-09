@@ -259,5 +259,7 @@
 	"admin.webTavilyHint": "Get your API key at tavily.com",
 	"admin.webBraveKey": "Brave API Key",
 	"admin.webBraveHint": "Get your API key at brave.com/search/api",
-	"admin.webDuckDuckGoNote": "DuckDuckGo requires no API key (fallback)."
+	"admin.webDuckDuckGoNote": "DuckDuckGo requires no API key (fallback).",
+	"admin.webPerplexityKey": "Perplexity API Key",
+	"admin.webPerplexityHint": "Get your API key at perplexity.ai"
 }

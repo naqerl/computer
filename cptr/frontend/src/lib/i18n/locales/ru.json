@@ -258,5 +258,7 @@
 	"admin.webTavilyHint": "Получите API-ключ на tavily.com",
 	"admin.webBraveKey": "API-ключ Brave",
 	"admin.webBraveHint": "Получите API-ключ на brave.com/search/api",
-	"admin.webDuckDuckGoNote": "DuckDuckGo не требует API-ключа (резервный вариант)."
+	"admin.webDuckDuckGoNote": "DuckDuckGo не требует API-ключа (резервный вариант).",
+	"admin.webPerplexityKey": "API-ключ Perplexity",
+	"admin.webPerplexityHint": "Получите API-ключ на perplexity.ai"
 }

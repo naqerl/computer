@@ -258,5 +258,7 @@
 	"admin.webTavilyHint": "Obtenez votre clé API sur tavily.com",
 	"admin.webBraveKey": "Clé API Brave",
 	"admin.webBraveHint": "Obtenez votre clé API sur brave.com/search/api",
-	"admin.webDuckDuckGoNote": "DuckDuckGo ne nécessite aucune clé API (solution de repli)."
+	"admin.webDuckDuckGoNote": "DuckDuckGo ne nécessite aucune clé API (solution de repli).",
+	"admin.webPerplexityKey": "Clé API Perplexity",
+	"admin.webPerplexityHint": "Obtenez votre clé API sur perplexity.ai"
 }

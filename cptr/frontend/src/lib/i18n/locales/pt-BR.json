@@ -258,5 +258,7 @@
 	"admin.webTavilyHint": "Obtenha sua chave de API em tavily.com",
 	"admin.webBraveKey": "Chave de API da Brave",
 	"admin.webBraveHint": "Obtenha sua chave de API em brave.com/search/api",
-	"admin.webDuckDuckGoNote": "DuckDuckGo não exige chave de API (fallback)."
+	"admin.webDuckDuckGoNote": "DuckDuckGo não exige chave de API (fallback).",
+	"admin.webPerplexityKey": "Chave de API do Perplexity",
+	"admin.webPerplexityHint": "Obtenha sua chave de API em perplexity.ai"
 }

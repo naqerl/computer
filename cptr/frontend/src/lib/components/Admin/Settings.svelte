@@ -14,6 +14,7 @@
 	let exaKey = $state('');
 	let tavilyKey = $state('');
 	let braveKey = $state('');
+	let perplexityKey = $state('');
 
 	async function loadConfig() {
 		try {
@@ -21,6 +22,7 @@
 			exaKey = config['web.exa_api_key'] || '';
 			tavilyKey = config['web.tavily_api_key'] || '';
 			braveKey = config['web.brave_api_key'] || '';
+			perplexityKey = config['web.perplexity_api_key'] || '';
 		} catch {
 			toast.error($t('admin.failedToLoadConfig'));
 		} finally {
@@ -106,6 +108,7 @@
 					<option value="exa">Exa</option>
 					<option value="tavily">Tavily</option>
 					<option value="brave">Brave</option>
+					<option value="perplexity">Perplexity</option>
 					<option value="duckduckgo">DuckDuckGo</option>
 				</select>
 			</div>
@@ -170,6 +173,23 @@
 				<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-2">
 					{$t('admin.webDuckDuckGoNote')}
 				</p>
+			{:else if provider === 'perplexity'}
+				<div class="mt-3">
+					<label class="block text-[13px] text-gray-700 dark:text-gray-300 mb-1"
+						>{$t('admin.webPerplexityKey')}</label
+					>
+					<input
+						type="password"
+						class="w-full text-[13px] bg-gray-50 dark:bg-white/4 border border-gray-200 dark:border-white/8 rounded-lg px-2.5 py-1.5 outline-none text-gray-700 dark:text-gray-300 placeholder:text-gray-400 dark:placeholder:text-gray-600"
+						placeholder="pplx-..."
+						bind:value={perplexityKey}
+						onblur={() => saveKey('web.perplexity_api_key', perplexityKey)}
+						disabled={saving}
+					/>
+					<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">
+						{$t('admin.webPerplexityHint')}
+					</p>
+				</div>
 			{/if}
 		{/if}
 

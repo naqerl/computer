@@ -258,5 +258,7 @@
 	"admin.webTavilyHint": "tavily.com에서 API 키를 받으세요",
 	"admin.webBraveKey": "Brave API 키",
 	"admin.webBraveHint": "brave.com/search/api에서 API 키를 받으세요",
-	"admin.webDuckDuckGoNote": "DuckDuckGo는 API 키가 필요 없습니다(대체)."
+	"admin.webDuckDuckGoNote": "DuckDuckGo는 API 키가 필요 없습니다(대체).",
+	"admin.webPerplexityKey": "Perplexity API 키",
+	"admin.webPerplexityHint": "perplexity.ai에서 API 키를 받으세요"
 }
