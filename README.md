@@ -32,6 +32,8 @@ Read our [Manifesto](MANIFESTO.md).
 pip install cptr
 ```
 
+Or with [uv](https://docs.astral.sh/uv/): `uvx cptr@latest run`
+
 ## Run
 
 ```bash
