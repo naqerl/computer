@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.0] - 2026-06-09
+
+### Added
+
+- ⏱️ **Automations.** Schedule recurring tasks that run on a timer. Each automation creates a real chat with full tool access, so they can do anything you'd do manually. Manage them from the new `/automations` page or ask the AI to create one.
+- 🔔 **Task completion notifications.** Get a browser notification (with optional sound) when a background task finishes. Toggle in Settings > General.
+- 🪝 **Webhook notifications.** Send alerts to Slack, Discord, Teams, or any webhook URL when tasks complete. Configure in Settings > General.
+- 💬 **Sidebar chat history.** Each workspace now shows its recent chats directly in the sidebar. Click to reopen, updates live as new chats come in.
+- 🗃️ **Config file sync.** Settings now persist to `config.toml` on disk, so your configuration survives across reinstalls and can be hand-edited.
+
+### Changed
+
+- 🎨 **Improved artifact cards.** File previews in chat now show a file icon and cleaner styling.
+
 ## [0.1.9] - 2026-06-07
 
 ### Fixed
