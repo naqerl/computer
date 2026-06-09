@@ -8,6 +8,7 @@ from fastapi.staticfiles import StaticFiles
 from cptr.routers import (
     admin_router,
     auth_router,
+    automations_router,
     chat_router,
     events_router,
     files_router,
@@ -37,6 +38,12 @@ async def startup():
         from cptr.utils.chat_task import reconcile_chat_state
 
         await reconcile_chat_state()
+
+    # Start automation scheduler
+    import asyncio
+    from cptr.utils.automations import scheduler_worker_loop
+
+    asyncio.create_task(scheduler_worker_loop(app))
 
 
 # Auth middleware
@@ -169,6 +176,7 @@ async def get_config():
 # Routers
 app.include_router(admin_router)
 app.include_router(auth_router)
+app.include_router(automations_router)
 app.include_router(chat_router)
 app.include_router(events_router)
 app.include_router(files_router)

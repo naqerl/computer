@@ -84,10 +84,17 @@ def _parse_simple_toml(text: str) -> dict:
         elif "=" in line and current_section:
             key, _, value = line.partition("=")
             key = key.strip()
+            # Handle quoted keys (e.g. "auth.signup_enabled")
+            if key.startswith('"') and key.endswith('"'):
+                key = key[1:-1]
+            elif key.startswith("'") and key.endswith("'"):
+                key = key[1:-1]
             value = value.strip()
             # Strip quotes
             if value.startswith('"') and value.endswith('"'):
                 value = value[1:-1]
+                # Unescape
+                value = value.replace('\\"', '"').replace("\\\\", "\\")
             elif value.startswith("'") and value.endswith("'"):
                 value = value[1:-1]
             elif value == "true":
@@ -114,15 +121,21 @@ def save_config(config: dict):
         if isinstance(values, dict):
             lines.append(f"[{section}]")
             for k, v in values.items():
+                # Quote keys that contain dots (e.g. "auth.signup_enabled")
+                key_str = f'"{k}"' if "." in k else k
                 if isinstance(v, str):
-                    lines.append(f'{k} = "{v}"')
+                    # Escape backslashes and quotes in string values
+                    escaped = v.replace("\\", "\\\\").replace('"', '\\"')
+                    lines.append(f'{key_str} = "{escaped}"')
                 elif isinstance(v, bool):
-                    lines.append(f"{k} = {'true' if v else 'false'}")
+                    lines.append(f"{key_str} = {'true' if v else 'false'}")
+                elif isinstance(v, (int, float)):
+                    lines.append(f"{key_str} = {v}")
                 elif isinstance(v, list):
                     items = ", ".join(f'"{i}"' if isinstance(i, str) else str(i) for i in v)
-                    lines.append(f"{k} = [{items}]")
+                    lines.append(f"{key_str} = [{items}]")
                 else:
-                    lines.append(f"{k} = {v}")
+                    lines.append(f"{key_str} = {v}")
             lines.append("")
     CONFIG_FILE.write_text("\n".join(lines))
     _config_cache = config
@@ -131,6 +144,65 @@ def save_config(config: dict):
 def invalidate_config_cache():
     global _config_cache
     _config_cache = None
+
+
+# ── App Config ↔ TOML sync ──────────────────────────────────
+
+
+def sync_config_to_toml(app_config: dict) -> None:
+    """Sync app config (DB key-value pairs) into the [app_config] section of config.toml.
+
+    Preserves existing server-level sections ([server], [auth], etc.).
+    Complex values (lists, dicts) are JSON-encoded as strings.
+    Called after every Config.upsert() so the file mirrors the DB.
+    """
+    import json as _json
+
+    config = load_config()
+    invalidate_config_cache()  # Force re-read next time
+
+    # Build the app_config section
+    toml_section: dict = {}
+    for key, value in app_config.items():
+        if isinstance(value, (list, dict)):
+            # Store complex types as JSON strings
+            toml_section[key] = _json.dumps(value, ensure_ascii=False)
+        else:
+            toml_section[key] = value
+
+    config["app_config"] = toml_section
+    save_config(config)
+
+
+def load_app_config_from_toml() -> dict:
+    """Read the [app_config] section from config.toml.
+
+    Returns {key: value} dict with JSON strings decoded back to Python objects.
+    Called on startup to seed the DB config table from the file.
+    """
+    import json as _json
+
+    invalidate_config_cache()  # Force fresh read from disk
+    config = load_config()
+    raw = config.get("app_config", {})
+    if not isinstance(raw, dict):
+        return {}
+
+    result: dict = {}
+    for key, value in raw.items():
+        if isinstance(value, str):
+            # Try to decode JSON strings back to complex types
+            try:
+                decoded = _json.loads(value)
+                if isinstance(decoded, (list, dict)):
+                    result[key] = decoded
+                else:
+                    result[key] = value
+            except (ValueError, _json.JSONDecodeError):
+                result[key] = value
+        else:
+            result[key] = value
+    return result
 
 
 # ── Password ─────────────────────────────────────────────────

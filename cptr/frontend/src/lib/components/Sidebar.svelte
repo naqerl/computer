@@ -9,8 +9,11 @@
 		sidebarOpen,
 		sidebarWidth,
 		appVersion,
-		showChangelog
+		showChangelog,
+		openChatTab,
+		setActiveTab
 	} from '$lib/stores';
+	import { get } from 'svelte/store';
 	import Sortable from 'sortablejs';
 	import Icon from './Icon.svelte';
 	import DirectoryPicker from './DirectoryPicker.svelte';
@@ -20,6 +23,10 @@
 	import { tooltip } from '$lib/tooltip';
 	import { session, clearSession } from '$lib/session';
 	import { getWelcome } from '$lib/apis/state';
+	import { getChats, type ChatInfo } from '$lib/apis/chat';
+	import ChatItem from './common/ChatItem.svelte';
+	import { chatEnabled } from '$lib/stores/chat';
+	import { socketStore } from '$lib/stores/socket.svelte';
 	import { t } from '$lib/i18n';
 
 	import { onMount, onDestroy } from 'svelte';
@@ -35,6 +42,109 @@
 	let menuButtonEl: HTMLButtonElement | undefined = $state();
 	let wsListEl: HTMLDivElement | undefined = $state();
 	let sortable: Sortable | null = null;
+
+	// ── Per-workspace chat history ──────────────────────────────
+	let expandedWorkspaces = $state<Set<string>>(new Set());
+	let wsChatsCache = $state<Map<string, ChatInfo[]>>(new Map());
+	let wsChatsLoading = $state<Set<string>>(new Set());
+
+	function toggleWorkspaceExpand(path: string) {
+		const next = new Set(expandedWorkspaces);
+		if (next.has(path)) {
+			next.delete(path);
+		} else {
+			next.add(path);
+			// Lazy-fetch chats if not cached
+			if (!wsChatsCache.has(path)) {
+				fetchWorkspaceChats(path);
+			}
+		}
+		expandedWorkspaces = next;
+	}
+
+	async function fetchWorkspaceChats(path: string) {
+		if (wsChatsLoading.has(path)) return;
+		wsChatsLoading = new Set([...wsChatsLoading, path]);
+		try {
+			const data = await getChats(path, 5, 0, 'updated_at', 'desc');
+			wsChatsCache = new Map([...wsChatsCache, [path, data.chats || []]]);
+		} catch {
+			wsChatsCache = new Map([...wsChatsCache, [path, []]]);
+		} finally {
+			const next = new Set(wsChatsLoading);
+			next.delete(path);
+			wsChatsLoading = next;
+		}
+	}
+
+	function relativeTime(ts: number): string {
+		// ts is in milliseconds
+		const now = Date.now();
+		const diffMs = now - ts;
+		const diffSec = Math.floor(diffMs / 1000);
+		if (diffSec < 60) return 'now';
+		const diffMin = Math.floor(diffSec / 60);
+		if (diffMin < 60) return `${diffMin}m`;
+		const diffHr = Math.floor(diffMin / 60);
+		if (diffHr < 24) return `${diffHr}h`;
+		const diffDay = Math.floor(diffHr / 24);
+		if (diffDay < 30) return `${diffDay}d`;
+		const diffMonth = Math.floor(diffDay / 30);
+		return `${diffMonth}mo`;
+	}
+
+	function handleSidebarChatClick(chatId: string, wsPath: string, title: string) {
+		// If not already on this workspace, navigate first
+		const currentWsPath = $page.url.searchParams.get('workspace');
+		if ($page.url.pathname !== '/' || currentWsPath !== wsPath) {
+			goto(`/?workspace=${encodeURIComponent(wsPath)}`);
+		}
+		openChatTab(chatId, undefined, title);
+		if (typeof window !== 'undefined' && window.innerWidth < 768) {
+			sidebarOpen.set(false);
+		}
+	}
+
+	function handleShowMoreChats(wsPath: string) {
+		// Navigate to the workspace and focus an existing chat tab (landing/history)
+		// instead of always creating a new one
+		goto(`/?workspace=${encodeURIComponent(wsPath)}`);
+
+		// Check if there's already a chat tab showing the landing page (no specific chatId)
+		const ws = get(currentWorkspace);
+		if (ws) {
+			for (const group of ws.groups) {
+				const existing = group.tabs.find(
+					(t) => t.type === 'chat' && (t.path?.startsWith('new-') || t.path?.startsWith('pending-'))
+				);
+				if (existing) {
+					setActiveTab(existing.id, group.id);
+					if (typeof window !== 'undefined' && window.innerWidth < 768) sidebarOpen.set(false);
+					return;
+				}
+			}
+		}
+
+		openChatTab();
+		if (typeof window !== 'undefined' && window.innerWidth < 768) {
+			sidebarOpen.set(false);
+		}
+	}
+
+	// Socket listener for chat events — invalidate cache when chats update
+	const seenChatIds = new Set<string>();
+
+	function handleChatEvent(data: { chat_id: string; done?: boolean; title?: string; delta?: string; workspace?: string }) {
+		// Re-fetch on done, title update, or first event of a new chat
+		const isNew = !seenChatIds.has(data.chat_id);
+		seenChatIds.add(data.chat_id);
+
+		if (!data.done && !data.title && !isNew) return;
+
+		for (const path of expandedWorkspaces) {
+			fetchWorkspaceChats(path);
+		}
+	}
 
 	const MIN_WIDTH = 160;
 	const MAX_WIDTH = 400;
@@ -136,10 +246,25 @@
 				}
 			});
 		}
+
+		// Bind socket listener for chat cache invalidation
+		const tryBind = () => {
+			const socket = socketStore.getSocket();
+			if (!socket) {
+				setTimeout(tryBind, 200);
+				return;
+			}
+			socket.on('events:chat', handleChatEvent);
+		};
+		tryBind();
 	});
 
 	onDestroy(() => {
 		sortable?.destroy();
+		const socket = socketStore.getSocket();
+		if (socket) {
+			socket.off('events:chat', handleChatEvent);
+		}
 	});
 </script>
 
@@ -183,6 +308,22 @@
 			</button>
 		</div>
 
+		<!-- Automations -->
+		<div class="px-1.5 mt-1 shrink-0">
+			<a
+				href="/automations"
+				class="flex items-center gap-1.5 w-full h-7 px-2 rounded-lg text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100 no-underline"
+				onclick={(e) => {
+					e.preventDefault();
+					goto('/automations');
+					if (typeof window !== 'undefined' && window.innerWidth < 768) sidebarOpen.set(false);
+				}}
+			>
+				<Icon name="clock" size={14} />
+				<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap">Automations</span>
+			</a>
+		</div>
+
 		<!-- Workspace section header -->
 		<div class="flex items-center justify-between h-8 pl-3.5 pr-1.5 shrink-0">
 			<span class="text-xs text-gray-400 dark:text-gray-500">{$t('sidebar.workspaces')}</span>
@@ -199,28 +340,81 @@
 		<!-- Workspace list -->
 		<div bind:this={wsListEl} class="flex-1 overflow-y-auto px-1.5">
 			{#each $workspaceList as ws (ws.path)}
-				<a
-					href="/?workspace={encodeURIComponent(ws.path)}"
-					class="group flex items-center gap-1.5 w-full h-7 px-2 rounded-lg text-xs font-medium transition-colors duration-100 no-underline
-						{ws.path === currentPath
-						? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
-						: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
-					onclick={(e) => handleWorkspaceClick(e, ws.path)}
-				>
-					<Icon name="folder" size={14} />
-					<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap"
-						>{ws.name}</span
+				{@const isExpanded = expandedWorkspaces.has(ws.path)}
+				{@const chats = wsChatsCache.get(ws.path)}
+				{@const isLoading = wsChatsLoading.has(ws.path)}
+				<div class="ws-item">
+					<a
+						href="/?workspace={encodeURIComponent(ws.path)}"
+						class="group flex items-center gap-1.5 w-full h-7 px-2 rounded-lg text-xs font-medium transition-colors duration-100 no-underline
+							{ws.path === currentPath
+							? 'bg-gray-200/50 text-gray-900 dark:bg-white/8 dark:text-white'
+							: 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}"
+						onclick={(e) => handleWorkspaceClick(e, ws.path)}
 					>
-					<span
-						class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
-						role="button"
-						tabindex="-1"
-						onclick={(e) => openWsMenu(e, ws.path)}
-						aria-label={$t('sidebar.workspaceOptions')}
-					>
-						<Icon name="three-dots" size={11} />
-					</span>
-				</a>
+						<!-- Icon: folder by default, chevron on hover (when chat enabled) -->
+						{#if $chatEnabled}
+							<span
+								class="ws-icon-toggle shrink-0"
+								role="button"
+								tabindex="-1"
+								onclick={(e) => {
+									e.stopPropagation();
+									e.preventDefault();
+									toggleWorkspaceExpand(ws.path);
+								}}
+								aria-label={isExpanded ? 'Collapse' : 'Expand'}
+							>
+								<span class="ws-icon-folder"><Icon name="folder" size={14} /></span>
+								<span class="ws-icon-chevron" style="transform: rotate({isExpanded ? '90deg' : '0deg'})">
+									<Icon name="chevron-right" size={11} />
+								</span>
+							</span>
+						{:else}
+							<Icon name="folder" size={14} />
+						{/if}
+						<span class="flex-1 text-left overflow-hidden text-ellipsis whitespace-nowrap"
+							>{ws.name}</span
+						>
+						<span
+							class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-400 opacity-0 group-hover:opacity-100 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
+							role="button"
+							tabindex="-1"
+							onclick={(e) => openWsMenu(e, ws.path)}
+							aria-label={$t('sidebar.workspaceOptions')}
+						>
+							<Icon name="three-dots" size={11} />
+						</span>
+					</a>
+
+					<!-- Collapsible chat list -->
+					{#if $chatEnabled && isExpanded}
+						<div class="ws-chats">
+							{#if isLoading && !chats}
+								<div class="ws-chat-loading">
+									<span class="ws-chat-loading-dot"></span>
+									<span class="ws-chat-loading-dot"></span>
+									<span class="ws-chat-loading-dot"></span>
+								</div>
+							{:else if chats && chats.length > 0}
+								{#each chats as chat (chat.id)}
+									<ChatItem
+										{chat}
+										onclick={() => handleSidebarChatClick(chat.id, ws.path, chat.title)}
+									/>
+								{/each}
+								<button
+									class="ws-chat-show-more"
+									onclick={() => handleShowMoreChats(ws.path)}
+								>
+									{$t('sidebar.showMore')}
+								</button>
+							{:else if chats}
+								<!-- No chats yet, show nothing -->
+							{/if}
+						</div>
+					{/if}
+				</div>
 			{/each}
 
 			{#if $workspaceList.length === 0}
@@ -229,6 +423,8 @@
 				</div>
 			{/if}
 		</div>
+
+
 
 		<!-- Settings and profile footer pinned to the bottom -->
 		<div class="relative px-1 pb-0.5 shrink-0">
@@ -380,6 +576,122 @@
 		.resize-handle:hover,
 		.resize-handle.active {
 			background: rgba(150, 150, 150, 0.12);
+		}
+	}
+
+	/* ── Workspace chat items ────────────────────────────── */
+
+	.ws-item {
+		margin-bottom: 2px;
+	}
+
+	.ws-expand-btn {
+		display: none;
+	}
+
+	/* Icon toggle: folder by default, chevron on hover */
+	.ws-icon-toggle {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: 14px;
+		height: 14px;
+		cursor: pointer;
+	}
+
+	.ws-icon-folder {
+		display: flex;
+		transition: opacity 0.1s;
+	}
+
+	.ws-icon-chevron {
+		position: absolute;
+		inset: 0;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		opacity: 0;
+		transition: opacity 0.1s, transform 0.1s;
+		color: #9ca3af;
+	}
+
+	:global(.dark) .ws-icon-chevron {
+		color: #6b7280;
+	}
+
+	/* On icon hover only, swap folder → chevron */
+	.ws-icon-toggle:hover .ws-icon-folder {
+		opacity: 0;
+	}
+
+	.ws-icon-toggle:hover .ws-icon-chevron {
+		opacity: 1;
+	}
+
+	.ws-chats {
+		padding-left: 4px;
+		padding-bottom: 4px;
+	}
+
+	.ws-chat-show-more {
+		display: block;
+		width: 100%;
+		padding: 2px 8px;
+		border: none;
+		background: none;
+		cursor: pointer;
+		font-size: 11px;
+		color: #b0b5be;
+		text-align: left;
+		transition: color 0.1s;
+	}
+
+	.ws-chat-show-more:hover {
+		color: #6b7280;
+	}
+
+	:global(.dark) .ws-chat-show-more {
+		color: #6b7280;
+	}
+
+	:global(.dark) .ws-chat-show-more:hover {
+		color: #9ca3af;
+	}
+
+	.ws-chat-loading {
+		display: flex;
+		gap: 4px;
+		padding: 6px 8px;
+	}
+
+	.ws-chat-loading-dot {
+		width: 4px;
+		height: 4px;
+		border-radius: 50%;
+		background: #9ca3af;
+		animation: dotPulse 1s ease-in-out infinite;
+	}
+
+	:global(.dark) .ws-chat-loading-dot {
+		background: #6b7280;
+	}
+
+	.ws-chat-loading-dot:nth-child(2) {
+		animation-delay: 0.15s;
+	}
+
+	.ws-chat-loading-dot:nth-child(3) {
+		animation-delay: 0.3s;
+	}
+
+	@keyframes dotPulse {
+		0%,
+		100% {
+			opacity: 0.3;
+		}
+		50% {
+			opacity: 1;
 		}
 	}
 </style>

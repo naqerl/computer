@@ -666,7 +666,7 @@ export function openPreviewTab(port: number, targetGroupId?: string): void {
 	}));
 }
 
-export function openChatTab(chatId?: string, targetGroupId?: string): void {
+export function openChatTab(chatId?: string, targetGroupId?: string, label?: string): void {
 	const ws = get(currentWorkspace);
 	if (!ws) return;
 
@@ -686,7 +686,7 @@ export function openChatTab(chatId?: string, targetGroupId?: string): void {
 	const newTab: Tab = {
 		id: nextId(),
 		type: 'chat',
-		label: 'New Chat',
+		label: label || 'New Chat',
 		path: chatId || `new-${Date.now()}`
 	};
 

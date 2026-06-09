@@ -32,3 +32,7 @@ CHAT_TOOL_COMMAND_MAX_CHARS = int(os.environ.get("CHAT_TOOL_COMMAND_MAX_CHARS", 
 STREAM_CONNECT_TIMEOUT_SECONDS = float(os.environ.get("CPTR_STREAM_CONNECT_TIMEOUT", "30"))
 STREAM_READ_TIMEOUT_SECONDS = float(os.environ.get("CPTR_STREAM_READ_TIMEOUT", "300"))
 STREAM_WRITE_TIMEOUT_SECONDS = float(os.environ.get("CPTR_STREAM_WRITE_TIMEOUT", "600"))
+
+# ── Automation scheduler ────────────────────────────────────
+AUTOMATION_POLL_INTERVAL = int(os.environ.get("AUTOMATION_POLL_INTERVAL", "10"))
+

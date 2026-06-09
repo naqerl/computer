@@ -12,7 +12,7 @@
 	import FileSuggestionPopup from './FileSuggestionPopup.svelte';
 	import { searchFiles } from '$lib/apis/files';
 	import { uploadFile } from '$lib/apis/files';
-	import ModelSelector from './ModelSelector.svelte';
+	import ModelSelector from '../common/ModelSelector.svelte';
 	import SendButton from './SendButton.svelte';
 	import PlusMenu from './PlusMenu.svelte';
 	import DictateButton from './DictateButton.svelte';
@@ -452,6 +452,9 @@
 				<PlusMenu
 					onfiles={(files) => {
 						if (files) processFiles(Array.from(files));
+					}}
+					oncapture={(file) => {
+						processFiles([file]);
 					}}
 				/>
 				{#if $planMode}

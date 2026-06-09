@@ -102,8 +102,16 @@ export function bindGlobalChatListener() {
 						componentProps: {
 							title,
 							content: body,
-							onClick: () => {
-								openChatTab(chatId);
+							onClick: async () => {
+								// Navigate to workspace page first if not already there
+								const wsPath = data.workspace;
+								if (wsPath && window.location.pathname !== '/') {
+									const { goto } = await import('$app/navigation');
+									await goto(`/?workspace=${encodeURIComponent(wsPath)}`);
+									setTimeout(() => openChatTab(chatId), 300);
+								} else {
+									openChatTab(chatId);
+								}
 								toast.dismiss(toastId);
 							},
 							onclose: () => {

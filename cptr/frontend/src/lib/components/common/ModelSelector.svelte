@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { tick } from 'svelte';
 	import { chatModels } from '$lib/stores/chat';
-	import DropdownMenu from '$lib/components/DropdownMenu.svelte';
+	import DropdownMenu from '../DropdownMenu.svelte';
 
 	interface Props {
 		selectedModel: string;

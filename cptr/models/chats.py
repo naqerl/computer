@@ -18,7 +18,7 @@ def _uuid() -> str:
 class Chat(Base):
     """A chat conversation. Workspace association lives in the filesystem."""
 
-    __tablename__ = "chat"
+    __tablename__ = "chats"
 
     id = Column(Text, primary_key=True, default=_uuid)
     user_id = Column(Text, ForeignKey("users.id"), nullable=False)
@@ -121,10 +121,10 @@ class Chat(Base):
 class ChatMessage(Base):
     """A single message in a chat conversation."""
 
-    __tablename__ = "chat_message"
+    __tablename__ = "chat_messages"
 
     id = Column(Text, primary_key=True, default=_uuid)
-    chat_id = Column(Text, ForeignKey("chat.id", ondelete="CASCADE"), nullable=False, index=True)
+    chat_id = Column(Text, ForeignKey("chats.id", ondelete="CASCADE"), nullable=False, index=True)
     parent_id = Column(Text, nullable=True)
     role = Column(Text, nullable=False)  # "user" | "assistant"
     content = Column(Text, nullable=False)  # Flattened text content

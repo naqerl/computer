@@ -546,6 +546,32 @@ def _append_tool_to_messages(messages: list[dict], event: dict, result: str, pro
 # ── Connection resolution ───────────────────────────────────
 
 
+def build_artifact_item(tool_name: str, arguments: dict, result: str) -> dict | None:
+    """Build an artifact output item if the tool call produced an artifact.
+
+    Works for both create_artifact and create_file with artifact_type.
+    Returns None if no artifact card should be shown.
+    """
+    artifact_type = arguments.get("artifact_type", "")
+    if tool_name == "create_artifact":
+        artifact_type = artifact_type or "implementation_plan"
+    if not artifact_type:
+        return None
+
+    try:
+        meta = json.loads(result)
+    except (json.JSONDecodeError, TypeError):
+        meta = {}
+
+    return {
+        "type": "artifact",
+        "artifact_type": artifact_type,
+        "title": meta.get("title") or arguments.get("title") or artifact_type.replace("_", " ").title(),
+        "content": arguments.get("content", ""),
+        "path": meta.get("path") or arguments.get("path", ""),
+    }
+
+
 def _default_base_url(provider: str) -> str:
     return {
         "anthropic": "https://api.anthropic.com/v1",
@@ -714,23 +740,8 @@ async def run_chat_task(
                         _sync_state()
 
                         # Artifact UI card: detect create_artifact or create_file with artifact_type
-                        args = event["arguments"]
-                        artifact_type = args.get("artifact_type", "")
-                        if name == "create_artifact":
-                            artifact_type = artifact_type or "implementation_plan"
-                        if artifact_type:
-                            # Parse metadata from tool result or build from args
-                            try:
-                                meta = json.loads(result)
-                            except (json.JSONDecodeError, TypeError):
-                                meta = {}
-                            artifact_item = {
-                                "type": "artifact",
-                                "artifact_type": artifact_type,
-                                "title": meta.get("title") or args.get("title") or artifact_type.replace("_", " ").title(),
-                                "content": args.get("content", ""),
-                                "path": meta.get("path", ""),
-                            }
+                        artifact_item = build_artifact_item(name, event["arguments"], result)
+                        if artifact_item:
                             output_items.append(artifact_item)
                             await emit(output=artifact_item)
                             _sync_state()

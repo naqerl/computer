@@ -56,3 +56,16 @@ class Config(Base):
                 else:
                     db.add(Config(key=key, value=value))
             await db.commit()
+
+        # Sync all config to config.toml so file mirrors DB
+        try:
+            all_config = await Config.get_all()
+            from cptr.utils.config import sync_config_to_toml
+
+            sync_config_to_toml(all_config)
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Failed to sync config to TOML", exc_info=True
+            )

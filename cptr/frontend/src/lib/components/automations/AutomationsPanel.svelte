@@ -1,0 +1,386 @@
+<script lang="ts">
+	/**
+	 * Automations panel — list + detail view.
+	 * Rendered as a full-page SvelteKit route.
+	 */
+	import { goto } from '$app/navigation';
+	import Icon from '../Icon.svelte';
+	import ToggleSwitch from '../ToggleSwitch.svelte';
+	import Spinner from '../common/Spinner.svelte';
+	import AutomationModal from './AutomationModal.svelte';
+	import { openChatTab, sidebarOpen } from '$lib/stores';
+	import {
+		getAutomations,
+		toggleAutomation,
+		deleteAutomation,
+		runAutomation,
+		getAutomationById,
+		getAutomationRuns,
+		type AutomationData,
+		type AutomationRunData
+	} from '$lib/apis/automations';
+	import { toast } from 'svelte-sonner';
+
+	interface Props {
+		automationId?: string;
+	}
+
+	let { automationId }: Props = $props();
+
+	// ── List state ──
+	let items = $state<AutomationData[]>([]);
+	let total = $state(0);
+	let loading = $state(true);
+	let searchQuery = $state('');
+	let statusFilter = $state('all');
+	let showModal = $state(false);
+	let editingAutomation = $state<AutomationData | null>(null);
+
+	// ── Detail state ──
+	let detail = $state<AutomationData | null>(null);
+	let runs = $state<AutomationRunData[]>([]);
+	let detailLoading = $state(false);
+
+	async function loadList() {
+		loading = true;
+		try {
+			const res = await getAutomations(undefined, searchQuery || undefined, statusFilter);
+			items = res.items;
+			total = res.total;
+		} catch (e: any) {
+			toast.error(e.message || 'Failed to load automations');
+		} finally {
+			loading = false;
+		}
+	}
+
+	async function loadDetail(id: string) {
+		detailLoading = true;
+		try {
+			detail = await getAutomationById(id);
+			runs = await getAutomationRuns(id);
+		} catch (e: any) {
+			toast.error(e.message || 'Failed to load automation');
+		} finally {
+			detailLoading = false;
+		}
+	}
+
+	$effect(() => {
+		if (!automationId) {
+			loadList();
+		}
+	});
+
+	$effect(() => {
+		if (automationId) {
+			loadDetail(automationId);
+		}
+	});
+
+	async function handleToggle(a: AutomationData) {
+		try {
+			const updated = await toggleAutomation(a.id);
+			items = items.map((i) => (i.id === a.id ? updated : i));
+			if (detail?.id === a.id) detail = updated;
+		} catch (e: any) {
+			toast.error(e.message || 'Failed to toggle');
+		}
+	}
+
+	async function handleDelete(a: AutomationData) {
+		if (!confirm(`Delete "${a.name}"?`)) return;
+		try {
+			await deleteAutomation(a.id);
+			items = items.filter((i) => i.id !== a.id);
+			if (detail?.id === a.id) goto('/automations');
+			toast.success('Deleted');
+		} catch (e: any) {
+			toast.error(e.message || 'Failed to delete');
+		}
+	}
+
+	async function handleRunNow(a: AutomationData) {
+		try {
+			await runAutomation(a.id);
+			toast.success(`"${a.name}" triggered`);
+		} catch (e: any) {
+			toast.error(e.message || 'Failed to run');
+		}
+	}
+
+	function handleSave(saved: AutomationData) {
+		const idx = items.findIndex((i) => i.id === saved.id);
+		if (idx >= 0) {
+			items[idx] = saved;
+			items = [...items];
+		} else {
+			items = [saved, ...items];
+		}
+		if (detail?.id === saved.id) detail = saved;
+		showModal = false;
+		editingAutomation = null;
+	}
+
+	function formatTime(ns: number | null): string {
+		if (!ns) return '-';
+		return new Date(ns / 1_000_000).toLocaleString(undefined, {
+			month: 'short',
+			day: 'numeric',
+			hour: '2-digit',
+			minute: '2-digit'
+		});
+	}
+
+	function parseFrequency(rrule: string): string {
+		if (rrule.includes('COUNT=1')) return 'Once';
+		const match = rrule.match(/FREQ=(\w+)/);
+		if (!match) return 'Custom';
+		const freq = match[1].toLowerCase();
+		return freq.charAt(0).toUpperCase() + freq.slice(1);
+	}
+</script>
+
+<div class="flex flex-col h-full overflow-hidden">
+	{#if automationId}
+		<!-- ── Detail ── -->
+		{#if detailLoading}
+			<div class="flex items-center justify-center py-12">
+				<Spinner size={16} />
+			</div>
+		{:else if detail}
+			<!-- Header -->
+			<div class="flex items-center gap-2 h-9 px-3 border-b border-gray-200 dark:border-white/6 shrink-0">
+				{#if !$sidebarOpen}
+					<button
+						class="flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100"
+						onclick={() => sidebarOpen.set(true)}
+						title="Toggle sidebar"
+					>
+						<Icon name="sidebar-expand" size={14} />
+					</button>
+				{/if}
+				<button
+					class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
+					onclick={() => goto('/automations')}
+				>
+					<Icon name="chevron-left" size={12} />
+					<span>Automations</span>
+				</button>
+				<span class="text-gray-300 dark:text-gray-600">/</span>
+				<span class="text-xs text-gray-900 dark:text-white truncate">{detail.name}</span>
+
+				<div class="ml-auto flex items-center gap-2">
+					<ToggleSwitch value={detail.is_active} onchange={() => handleToggle(detail!)} />
+					<button
+						class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
+						onclick={() => handleRunNow(detail!)}
+						title="Run now"
+					>
+						<Icon name="play" size={11} />
+					</button>
+					<button
+						class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
+						onclick={() => { editingAutomation = detail; showModal = true; }}
+						title="Edit"
+					>
+						<Icon name="pencil" size={11} />
+					</button>
+					<button
+						class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-red-500 transition-colors duration-75"
+						onclick={() => handleDelete(detail!)}
+						title="Delete"
+					>
+						<Icon name="trash" size={11} />
+					</button>
+				</div>
+			</div>
+
+			<!-- Content -->
+			<div class="flex-1 overflow-y-auto">
+				<!-- Info rows -->
+				<div class="border-b border-gray-200 dark:border-white/6">
+					<div class="flex items-center h-7 px-3">
+						<span class="text-[11px] text-gray-400 dark:text-gray-500 w-20 shrink-0">Status</span>
+						<div class="flex items-center gap-1.5">
+							<span class="w-1.5 h-1.5 rounded-full {detail.is_active ? 'bg-emerald-500' : 'bg-gray-400'}"></span>
+							<span class="text-xs text-gray-700 dark:text-gray-300">{detail.is_active ? 'Active' : 'Paused'}</span>
+						</div>
+					</div>
+					<div class="flex items-center h-7 px-3">
+						<span class="text-[11px] text-gray-400 dark:text-gray-500 w-20 shrink-0">Schedule</span>
+						<span class="text-xs text-gray-700 dark:text-gray-300">{parseFrequency(detail.rrule)}</span>
+					</div>
+					<div class="flex items-center h-7 px-3">
+						<span class="text-[11px] text-gray-400 dark:text-gray-500 w-20 shrink-0">Model</span>
+						<span class="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{detail.model_id}</span>
+					</div>
+					<div class="flex items-center h-7 px-3">
+						<span class="text-[11px] text-gray-400 dark:text-gray-500 w-20 shrink-0">Next run</span>
+						<span class="text-xs text-gray-700 dark:text-gray-300">{formatTime(detail.next_run_at)}</span>
+					</div>
+					<div class="flex items-center h-7 px-3">
+						<span class="text-[11px] text-gray-400 dark:text-gray-500 w-20 shrink-0">Last run</span>
+						<span class="text-xs text-gray-700 dark:text-gray-300">{formatTime(detail.last_run_at)}</span>
+					</div>
+				</div>
+
+				<!-- Prompt -->
+				<div class="border-b border-gray-200 dark:border-white/6 px-3 py-2">
+					<div class="text-[11px] text-gray-400 dark:text-gray-500 mb-1">Prompt</div>
+					<div class="text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono leading-relaxed max-h-32 overflow-y-auto">
+						{detail.prompt}
+					</div>
+				</div>
+
+				<!-- Runs -->
+				<div class="px-3 py-2">
+					<div class="text-[11px] text-gray-400 dark:text-gray-500 mb-1">Runs</div>
+					{#if runs.length === 0}
+						<div class="text-[11px] text-gray-400 dark:text-gray-600 py-2">No runs yet</div>
+					{:else}
+						{#each runs as run}
+							<div class="flex items-center gap-2 h-7 text-xs">
+								<span class="w-1.5 h-1.5 rounded-full shrink-0 {run.status === 'success' ? 'bg-emerald-500' : 'bg-red-400'}"></span>
+								<span class="text-gray-500 dark:text-gray-400">{formatTime(run.created_at)}</span>
+								{#if run.chat_id}
+									<button
+										class="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
+										onclick={() => {
+											const ws = detail?.workspace;
+											if (ws) {
+												goto(`/?workspace=${encodeURIComponent(ws)}`);
+											}
+											setTimeout(() => openChatTab(run.chat_id!), 300);
+										}}
+									>
+										view chat →
+									</button>
+								{/if}
+								{#if run.error}
+									<span class="text-[11px] text-red-400 truncate" title={run.error}>{run.error}</span>
+								{/if}
+							</div>
+						{/each}
+					{/if}
+				</div>
+			</div>
+		{/if}
+	{:else}
+		<!-- ── List ── -->
+		<!-- Header -->
+		<div class="flex items-center gap-2 h-9 px-3 border-b border-gray-200 dark:border-white/6 shrink-0">
+			{#if !$sidebarOpen}
+				<button
+					class="flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors duration-100"
+					onclick={() => sidebarOpen.set(true)}
+					title="Toggle sidebar"
+				>
+					<Icon name="sidebar-expand" size={14} />
+				</button>
+			{/if}
+			<span class="text-xs text-gray-900 dark:text-white">Automations</span>
+			{#if total > 0}
+				<span class="text-[11px] text-gray-400 dark:text-gray-600">{total}</span>
+			{/if}
+
+			<div class="ml-auto flex items-center gap-1">
+				<select
+					class="text-[11px] bg-transparent text-gray-400 dark:text-gray-500 outline-none cursor-pointer"
+					bind:value={statusFilter}
+					onchange={loadList}
+				>
+					<option value="all">All</option>
+					<option value="active">Active</option>
+					<option value="paused">Paused</option>
+				</select>
+				<button
+					class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
+					onclick={() => { editingAutomation = null; showModal = true; }}
+					title="New automation"
+				>
+					<Icon name="plus" size={13} />
+				</button>
+			</div>
+		</div>
+
+		<!-- Search -->
+		<div class="flex items-center gap-1.5 h-8 px-3 border-b border-gray-200 dark:border-white/6 shrink-0">
+			<Icon name="search" size={13} class="text-gray-400 shrink-0" />
+			<input
+				type="text"
+				class="flex-1 border-none outline-none bg-transparent text-xs text-gray-900 dark:text-white placeholder:text-gray-400"
+				placeholder="Filter..."
+				bind:value={searchQuery}
+				oninput={loadList}
+			/>
+			{#if searchQuery}
+				<button class="text-gray-400 flex items-center" onclick={() => { searchQuery = ''; loadList(); }}>
+					<Icon name="xmark" size={11} />
+				</button>
+			{/if}
+		</div>
+
+		<!-- List -->
+		<div class="flex-1 overflow-y-auto p-1">
+			{#if loading}
+				<div class="flex items-center justify-center py-12">
+					<Spinner size={16} />
+				</div>
+			{:else if items.length === 0}
+				<div class="flex flex-col items-center justify-center py-12 gap-2">
+					<p class="text-xs text-gray-400 dark:text-gray-600">
+						{searchQuery ? 'No matches' : 'No automations yet'}
+					</p>
+					{#if !searchQuery}
+						<button
+							class="text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-1 rounded-lg bg-gray-100 dark:bg-white/6 transition-colors duration-75"
+							onclick={() => { editingAutomation = null; showModal = true; }}
+						>
+							Create automation
+						</button>
+					{/if}
+				</div>
+			{:else}
+				{#each items as a (a.id)}
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="flex items-center gap-2 h-7 px-2 rounded-md"
+					>
+						<span class="w-1.5 h-1.5 rounded-full shrink-0 {a.is_active ? 'bg-emerald-500' : 'bg-gray-400'}"></span>
+						<button
+							class="text-xs text-gray-700 dark:text-gray-300 truncate flex-1 text-left hover:underline cursor-pointer transition-colors duration-75"
+							onclick={() => goto(`/automations/${a.id}`)}
+						>
+							{a.name}
+						</button>
+						<span class="text-[11px] text-gray-400 dark:text-gray-600 shrink-0">{a.workspace.split('/').pop()}</span>
+						<span class="text-[11px] text-gray-400 dark:text-gray-600 shrink-0">·</span>
+						<span class="text-[11px] text-gray-400 dark:text-gray-600 shrink-0">{parseFrequency(a.rrule)}</span>
+
+						<div class="flex items-center gap-2 shrink-0" onclick={(e) => e.stopPropagation()}>
+							<button
+								class="flex items-center justify-center w-5 h-5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
+								onclick={() => handleRunNow(a)}
+								title="Run now"
+							>
+								<Icon name="play" size={11} />
+							</button>
+							<div class="flex items-center" onclick={(e) => e.stopPropagation()}>
+								<ToggleSwitch value={a.is_active} onchange={() => handleToggle(a)} />
+							</div>
+						</div>
+					</div>
+				{/each}
+			{/if}
+		</div>
+	{/if}
+</div>
+
+{#if showModal}
+	<AutomationModal
+		automation={editingAutomation}
+		onclose={() => { showModal = false; editingAutomation = null; }}
+		onsave={handleSave}
+	/>
+{/if}

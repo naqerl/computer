@@ -48,7 +48,7 @@
 		if (wsPath && wsPath !== lastLoadedPath) {
 			lastLoadedPath = wsPath;
 			loadWorkspace(wsPath);
-		} else if (!wsPath && lastLoadedPath !== null) {
+		} else if (!wsPath) {
 			lastLoadedPath = null;
 			currentWorkspace.set(null);
 		}
@@ -433,6 +433,7 @@
 								<PortPreview port={tab.port} />
 							</div>
 						{/each}
+
 
 						<!-- Fallback content for non-persisted states -->
 						{#if !groupTab || groupTab.type === 'files'}

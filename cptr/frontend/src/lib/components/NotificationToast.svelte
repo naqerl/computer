@@ -62,7 +62,7 @@
 <div
 	role="status"
 	aria-live="polite"
-	class="notification-toast group"
+	class="notification-toast group relative flex gap-2.5 text-left w-full bg-white dark:bg-[#1a1a1a] text-gray-700 dark:text-gray-300 border border-black/[0.08] dark:border-white/[0.06] shadow-lg dark:shadow-none rounded-2xl py-3 px-4 cursor-pointer select-none"
 	onpointerdown={onPointerDown}
 	onpointermove={onPointerMove}
 	onpointerup={onPointerUp}
@@ -71,7 +71,7 @@
 	<!-- Close button -->
 	<button
 		bind:this={closeButtonEl}
-		class="close-btn"
+		class="absolute -top-0.5 -left-0.5 p-0.5 rounded-full opacity-0 group-hover:opacity-100 bg-gray-200 dark:bg-[#222] text-gray-500 dark:text-gray-400 hover:bg-gray-300 dark:hover:bg-[#333] hover:text-gray-700 dark:hover:text-gray-300 border-none cursor-pointer transition-opacity duration-150 z-10"
 		aria-label="Dismiss notification"
 		onclick={(e) => { e.stopPropagation(); onclose(); }}
 	>
@@ -81,93 +81,24 @@
 	</button>
 
 	<!-- Icon -->
-	<div class="icon-wrap">
+	<div class="shrink-0 self-start -translate-y-0.5">
 		<img src="/favicon.png" alt="cptr" class="w-5 h-5 rounded-full" />
 	</div>
 
 	<!-- Content -->
-	<div class="content">
+	<div class="min-w-0">
 		{#if title}
-			<div class="title">{title}</div>
+			<div class="text-[13px] font-medium mb-0.5 overflow-hidden text-ellipsis whitespace-nowrap text-gray-900 dark:text-white">{title}</div>
 		{/if}
 		{#if content}
-			<div class="body">{content}</div>
+			<div class="text-xs text-gray-500 dark:text-[#aaa] font-normal line-clamp-2">{content}</div>
 		{/if}
 	</div>
 </div>
 
 <style>
 	.notification-toast {
-		position: relative;
-		display: flex;
-		gap: 0.625rem;
-		text-align: left;
-		width: 100%;
 		min-width: var(--width, 300px);
-		background: #111;
-		color: #e0e0e0;
-		border: 1px solid rgba(255, 255, 255, 0.06);
-		border-radius: 1rem;
-		padding: 0.75rem 1rem;
-		cursor: pointer;
-		user-select: none;
-	}
-
-	:global(.dark) .notification-toast {
-		background: #1a1a1a;
-	}
-
-	.close-btn {
-		position: absolute;
-		top: -0.125rem;
-		left: -0.125rem;
-		padding: 0.125rem;
-		border-radius: 9999px;
-		opacity: 0;
-		background: #222;
-		color: #888;
-		border: none;
-		cursor: pointer;
-		transition: opacity 0.15s;
-		z-index: 10;
-	}
-
-	.group:hover .close-btn {
-		opacity: 1;
-	}
-
-	.close-btn:hover {
-		background: #333;
-		color: #ccc;
-	}
-
-	.icon-wrap {
-		flex-shrink: 0;
-		align-self: flex-start;
-		transform: translateY(-0.125rem);
-	}
-
-	.content {
-		min-width: 0;
-	}
-
-	.title {
-		font-size: 13px;
-		font-weight: 500;
-		margin-bottom: 0.125rem;
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-		color: #fff;
-	}
-
-	.body {
-		font-size: 12px;
-		color: #aaa;
-		font-weight: 400;
-		display: -webkit-box;
-		-webkit-line-clamp: 2;
-		-webkit-box-orient: vertical;
-		overflow: hidden;
 	}
 </style>
+

@@ -3,6 +3,7 @@
 	import '@xterm/xterm/css/xterm.css';
 
 	import { onMount } from 'svelte';
+	import { page } from '$app/stores';
 	import Bar from '$lib/components/Bar.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import Sidebar from '$lib/components/Sidebar.svelte';
@@ -252,7 +253,7 @@
 		<Sidebar />
 
 		<div id="main-col" class="flex flex-col flex-1 min-w-0 min-h-0 overflow-hidden">
-			{#if !$currentWorkspace}
+			{#if !$currentWorkspace && $page.url.pathname === '/'}
 				<Bar />
 			{/if}
 			<main class="relative flex-1 min-h-0 overflow-hidden">
@@ -284,8 +285,9 @@
 
 <Toaster
 	position="top-right"
+	theme="system"
 	toastOptions={{
 		style:
-			'font-size: 12px; font-family: var(--font-sans); background: #111; color: #e0e0e0; border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;'
+			'font-size: 12px; font-family: var(--font-sans); background: transparent; border: none; box-shadow: none; border-radius: 8px; padding: 0;'
 	}}
 />

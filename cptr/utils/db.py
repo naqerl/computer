@@ -48,3 +48,40 @@ async def init_db():
     alembic_cfg.set_main_option("script_location", str(Path(__file__).parent.parent / "migrations"))
     alembic_cfg.set_main_option("sqlalchemy.url", f"sqlite:///{DB_FILE}")
     command.upgrade(alembic_cfg, "head")
+
+    # Seed DB config from config.toml (file is source of truth on startup)
+    await _seed_config_from_toml()
+
+
+async def _seed_config_from_toml():
+    """Load [app_config] from config.toml and upsert into the DB config table.
+
+    Called on every startup. The file always wins — this ensures config
+    survives DB loss and allows hand-editing the TOML file.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        from cptr.utils.config import load_app_config_from_toml
+
+        app_config = load_app_config_from_toml()
+        if not app_config:
+            return
+
+        # Direct DB upsert (not via Config.upsert to avoid re-syncing back to file)
+        from cptr.models.config import Config as ConfigModel
+
+        async with get_session_factory()() as db:
+            for key, value in app_config.items():
+                existing = await db.get(ConfigModel, key)
+                if existing:
+                    existing.value = value
+                else:
+                    db.add(ConfigModel(key=key, value=value))
+            await db.commit()
+
+        logger.info("Loaded %d config key(s) from config.toml", len(app_config))
+    except Exception:
+        logger.warning("Failed to seed config from config.toml", exc_info=True)

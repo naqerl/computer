@@ -7,14 +7,16 @@
 
 	interface Props {
 		onfiles: (files: FileList) => void;
+		oncapture?: (file: File) => void;
 	}
-	let { onfiles }: Props = $props();
+	let { onfiles, oncapture }: Props = $props();
 
 	let open = $state(false);
 	let tab = $state<'' | 'tools'>('');
 	let btnEl: HTMLButtonElement | undefined = $state();
 	let menuEl: HTMLDivElement | undefined = $state();
 	let inputEl: HTMLInputElement | undefined = $state();
+	let cameraInputEl: HTMLInputElement | undefined = $state();
 	let pos = $state<{ x: number; bottom: number }>({ x: -9999, bottom: -9999 });
 	let ready = $state(false);
 
@@ -64,6 +66,59 @@
 		}
 	}
 
+	function handleCameraChange() {
+		if (cameraInputEl?.files && cameraInputEl.files.length > 0) {
+			// Camera input returns image files — pass them through oncapture or onfiles
+			for (const file of Array.from(cameraInputEl.files)) {
+				if (oncapture) oncapture(file);
+			}
+			cameraInputEl.value = '';
+		}
+	}
+
+	function isMobileDevice(): boolean {
+		if (typeof navigator === 'undefined') return false;
+		const ua = navigator.userAgent || (navigator as any).vendor || (window as any).opera || '';
+		return /android|iphone|ipad|ipod|windows phone/i.test(ua);
+	}
+
+	async function captureHandler() {
+		open = false;
+		if (isMobileDevice()) {
+			// On mobile, open the camera
+			cameraInputEl?.click();
+			return;
+		}
+		// Desktop: use screen capture API
+		try {
+			const mediaStream = await navigator.mediaDevices.getDisplayMedia({
+				video: { cursor: 'never' } as any,
+				audio: false
+			});
+			const video = document.createElement('video');
+			video.srcObject = mediaStream;
+			await video.play();
+
+			const canvas = document.createElement('canvas');
+			canvas.width = video.videoWidth;
+			canvas.height = video.videoHeight;
+			const ctx = canvas.getContext('2d');
+			if (ctx) ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+			mediaStream.getTracks().forEach((t) => t.stop());
+			window.focus();
+
+			const blob = await new Promise<Blob | null>((res) => canvas.toBlob(res, 'image/png'));
+			if (blob) {
+				const file = new File([blob], `screen-capture-${Date.now()}.png`, { type: 'image/png' });
+				if (oncapture) oncapture(file);
+			}
+			video.srcObject = null;
+		} catch (err) {
+			console.error('Error capturing screen:', err);
+		}
+	}
+
 	function close() {
 		open = false;
 		ready = false;
@@ -85,6 +140,16 @@
 	accept="image/*,.pdf,.txt,.md,.csv,.json,.xml,.yaml,.yml,.html,.css,.js,.ts,.py,.go,.rs,.java,.c,.cpp,.h,.rb,.sh"
 	class="hidden"
 	onchange={handleFileChange}
+/>
+
+<!-- Hidden camera input for mobile capture -->
+<input
+	bind:this={cameraInputEl}
+	type="file"
+	accept="image/*"
+	capture="environment"
+	class="hidden"
+	onchange={handleCameraChange}
 />
 
 <button
@@ -144,6 +209,25 @@
 						/>
 					</svg>
 					<span class="flex-1 text-left truncate">Attach files</span>
+				</button>
+
+				<button
+					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
+					onclick={captureHandler}
+				>
+					<svg
+						class="size-3.5 shrink-0"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" />
+						<circle cx="12" cy="13" r="4" />
+					</svg>
+					<span class="flex-1 text-left truncate">Capture</span>
 				</button>
 
 				<div class="h-px bg-gray-100/50 dark:bg-white/3 mx-1 my-0.5"></div>

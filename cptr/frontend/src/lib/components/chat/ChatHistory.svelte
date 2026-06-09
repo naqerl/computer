@@ -1,8 +1,8 @@
 <script lang="ts">
 	import type { ChatInfo } from '$lib/apis/chat';
+	import ChatItem from '../common/ChatItem.svelte';
 	import DropdownMenu from '../DropdownMenu.svelte';
 	import Pagination from '../common/Pagination.svelte';
-	import Spinner from '../common/Spinner.svelte';
 
 	interface Props {
 		chats: ChatInfo[];
@@ -56,6 +56,9 @@
 		if (diffD < 7) return `${diffD}d ago`;
 		return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 	}
+
+	// Not used directly anymore (ChatItem has its own formatTime),
+	// but kept for the sort header display
 </script>
 
 {#snippet chevronUp()}
@@ -127,35 +130,11 @@
 		{/if}
 
 		{#each chats as chat (chat.id)}
-			<!-- svelte-ignore a11y_no_static_element_interactions -->
-			<div
-				class="group flex items-center gap-2 w-full h-7 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-white/4 transition-colors duration-75 cursor-pointer"
-				role="button"
-				tabindex="0"
+			<ChatItem
+				{chat}
 				onclick={() => onopen(chat.id)}
-				onkeydown={(e) => {
-					if (e.key === 'Enter') onopen(chat.id);
-				}}
-			>
-				{#if chat.is_active}
-					<Spinner size={10} borderWidth={1.5} class="opacity-50" />
-				{/if}
-				<span class="flex-1 text-xs text-gray-500 dark:text-gray-500 truncate">{chat.title}</span>
-				<span class="text-[10px] text-gray-300 dark:text-gray-700 shrink-0"
-					>{formatTime(chat.updated_at)}</span
-				>
-				<button
-					class="flex items-center justify-center w-5 h-5 rounded shrink-0 text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 transition-all duration-75"
-					onclick={(e) => openMenu(e, chat.id)}
-					aria-label="Chat options"
-				>
-					<svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor">
-						<circle cx="3" cy="8" r="1.5" />
-						<circle cx="8" cy="8" r="1.5" />
-						<circle cx="13" cy="8" r="1.5" />
-					</svg>
-				</button>
-			</div>
+				onmenu={(e) => openMenu(e, chat.id)}
+			/>
 		{/each}
 		{#if onpagechange}
 			<Pagination {page} {totalPages} {onpagechange} />

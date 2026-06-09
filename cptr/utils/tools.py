@@ -323,9 +323,28 @@ async def create_file(
     :param overwrite: Set to true to overwrite an existing file.
     :param artifact_type: Set to 'implementation_plan' to present a plan for user review before coding.
     """
-    # Artifact-only: skip workspace file write
+    # Artifact-only: save to .cptr/artifacts/ (same location as create_artifact)
     if artifact_type and not path:
-        return f"Artifact created ({len(content)} bytes)"
+        from datetime import datetime, timezone
+
+        ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S")
+        artifact_dir = Path(workspace) / ".cptr" / "artifacts"
+        artifact_dir.mkdir(parents=True, exist_ok=True)
+        artifact_path = artifact_dir / f"{ts}_{artifact_type}.md"
+
+        def _write_artifact():
+            artifact_path.write_text(content)
+
+        await asyncio.to_thread(_write_artifact)
+
+        rel_path = str(artifact_path.relative_to(Path(workspace)))
+        display_title = artifact_type.replace("_", " ").title()
+        return json.dumps({
+            "artifact_type": artifact_type,
+            "title": display_title,
+            "path": rel_path,
+            "bytes": len(content),
+        })
 
     if not path:
         return "Error: path is required when artifact_type is not set."
@@ -671,6 +690,226 @@ def _resolve_path(path: str, workspace: str) -> Path:
     return full
 
 
+async def create_automation(
+    name: str,
+    prompt: str,
+    rrule: str,
+    model_id: str = "",
+    *,
+    workspace: str,
+) -> str:
+    """Create a scheduled automation that runs a prompt on a recurring or one-time schedule.
+    The rrule parameter must be a valid iCalendar RRULE string. Common examples:
+    - Every day at 9am: "DTSTART:20250101T090000\\nRRULE:FREQ=DAILY"
+    - Every Monday at 8am: "DTSTART:20250106T080000\\nRRULE:FREQ=WEEKLY;BYDAY=MO"
+    - Every hour: "RRULE:FREQ=HOURLY;INTERVAL=1"
+    - Once at a specific time: "DTSTART:20250415T140000\\nRRULE:FREQ=DAILY;COUNT=1"
+    - First day of every month: "DTSTART:20250101T090000\\nRRULE:FREQ=MONTHLY;BYMONTHDAY=1"
+    :param name: A short descriptive name for the automation.
+    :param prompt: The instructions/prompt to execute on each run.
+    :param rrule: An iCalendar RRULE string defining the schedule.
+    :param model_id: Model to use (optional, defaults to the current chat model).
+    """
+    try:
+        import time
+        from cptr.models.automations import Automation as AutomationModel
+        from cptr.utils.automations import next_run_ns, next_n_runs_ns, validate_rrule
+
+        # Validate RRULE
+        try:
+            validate_rrule(rrule)
+        except ValueError as e:
+            return json.dumps({"error": f"Invalid schedule: {e}"})
+
+        # If no model_id provided, try to detect from admin config
+        if not model_id:
+            try:
+                from cptr.models.config import AdminConfig
+                cfg = await AdminConfig.get()
+                model_id = (cfg.meta or {}).get("default_model", "") if cfg else ""
+            except Exception:
+                pass
+        if not model_id:
+            return json.dumps({"error": "Could not detect model. Please provide model_id."})
+
+        now_ns = int(time.time() * 1_000_000_000)
+        nxt = next_run_ns(rrule)
+
+        automation = await AutomationModel.create(
+            user_id="default",
+            name=name,
+            prompt=prompt,
+            model_id=model_id,
+            workspace=workspace,
+            rrule=rrule,
+            next_run_at=nxt,
+            is_active=True,
+            created_at=now_ns,
+        )
+        return json.dumps({
+            "status": "success",
+            "id": automation.id,
+            "name": automation.name,
+            "model_id": automation.model_id,
+            "is_active": automation.is_active,
+            "next_runs": next_n_runs_ns(rrule),
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def list_automations(
+    status: str = "",
+    count: int = 10,
+    *,
+    workspace: str,
+) -> str:
+    """List scheduled automations for the current workspace.
+    :param status: Filter by status: "active", "paused", or empty for all.
+    :param count: Maximum number of automations to return (default: 10).
+    """
+    try:
+        from cptr.models.automations import Automation as AutomationModel
+        from cptr.utils.automations import next_n_runs_ns
+
+        items, total = await AutomationModel.get_by_workspace(
+            user_id="default",
+            workspace=workspace or None,
+            status=status or None,
+            limit=count,
+        )
+        automations = []
+        for item in items:
+            automations.append({
+                "id": item.id,
+                "name": item.name,
+                "prompt_snippet": item.prompt[:100] + ("..." if len(item.prompt) > 100 else ""),
+                "model_id": item.model_id,
+                "rrule": item.rrule,
+                "is_active": item.is_active,
+                "last_run_at": item.last_run_at,
+                "next_runs": next_n_runs_ns(item.rrule),
+            })
+        return json.dumps({"automations": automations, "total": total})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def update_automation(
+    automation_id: str,
+    name: str = "",
+    prompt: str = "",
+    rrule: str = "",
+    model_id: str = "",
+    *,
+    workspace: str,
+) -> str:
+    """Update an existing automation. Only provided fields are changed.
+    :param automation_id: The ID of the automation to update.
+    :param name: New name (optional).
+    :param prompt: New prompt/instructions (optional).
+    :param rrule: New iCalendar RRULE schedule string (optional).
+    :param model_id: New model ID (optional).
+    """
+    try:
+        import time
+        from cptr.models.automations import Automation as AutomationModel
+        from cptr.utils.automations import next_run_ns, next_n_runs_ns, validate_rrule
+
+        automation = await AutomationModel.get_by_id(automation_id)
+        if not automation:
+            return json.dumps({"error": "Automation not found"})
+
+        kwargs = {}
+        if name:
+            kwargs["name"] = name
+        if prompt:
+            kwargs["prompt"] = prompt
+        if model_id:
+            kwargs["model_id"] = model_id
+        if rrule:
+            try:
+                validate_rrule(rrule)
+            except ValueError as e:
+                return json.dumps({"error": f"Invalid schedule: {e}"})
+            kwargs["rrule"] = rrule
+            kwargs["next_run_at"] = next_run_ns(rrule)
+
+        if not kwargs:
+            return json.dumps({"error": "No fields to update"})
+
+        now_ns = int(time.time() * 1_000_000_000)
+        success = await AutomationModel.update_by_id(automation_id, updated_at=now_ns, **kwargs)
+        if not success:
+            return json.dumps({"error": "Failed to update automation"})
+
+        final_rrule = rrule or automation.rrule
+        return json.dumps({
+            "status": "success",
+            "id": automation_id,
+            "updated_fields": list(kwargs.keys()),
+            "next_runs": next_n_runs_ns(final_rrule),
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def toggle_automation(
+    automation_id: str,
+    *,
+    workspace: str,
+) -> str:
+    """Pause or resume a scheduled automation. If active, it will be paused. If paused, it will be resumed.
+    :param automation_id: The ID of the automation to toggle.
+    """
+    try:
+        from cptr.models.automations import Automation as AutomationModel
+        from cptr.utils.automations import next_run_ns
+
+        automation = await AutomationModel.get_by_id(automation_id)
+        if not automation:
+            return json.dumps({"error": "Automation not found"})
+
+        nxt = next_run_ns(automation.rrule) if not automation.is_active else None
+        toggled = await AutomationModel.toggle(automation_id, next_run_at=nxt)
+        if not toggled:
+            return json.dumps({"error": "Failed to toggle automation"})
+
+        return json.dumps({
+            "status": "success",
+            "id": toggled.id,
+            "name": toggled.name,
+            "is_active": toggled.is_active,
+        })
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+async def delete_automation(
+    automation_id: str,
+    *,
+    workspace: str,
+) -> str:
+    """Delete a scheduled automation and all its run history.
+    :param automation_id: The ID of the automation to delete.
+    """
+    try:
+        from cptr.models.automations import Automation as AutomationModel
+
+        automation = await AutomationModel.get_by_id(automation_id)
+        if not automation:
+            return json.dumps({"error": "Automation not found"})
+
+        name = automation.name
+        success = await AutomationModel.delete(automation_id)
+        if not success:
+            return json.dumps({"error": "Failed to delete automation"})
+
+        return json.dumps({"status": "success", "message": f'Automation "{name}" deleted'})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 # ── Registry ────────────────────────────────────────────────
 
 TOOLS: dict[str, dict] = {
@@ -681,6 +920,7 @@ TOOLS: dict[str, dict] = {
     "check_task": {"fn": check_task, "auto": True},
     "web_search": {"fn": web_search, "auto": True},
     "read_url": {"fn": read_url, "auto": True},
+    "list_automations": {"fn": list_automations, "auto": True},
     # Write / mutate (require approval unless auto_approve_all)
     "create_file": {"fn": create_file, "auto": False},
     "edit_file": {"fn": edit_file, "auto": False},
@@ -688,6 +928,10 @@ TOOLS: dict[str, dict] = {
     "write_file": {"fn": write_file, "auto": False},
     "run_command": {"fn": run_command, "auto": False},
     "kill_task": {"fn": kill_task, "auto": False},
+    "create_automation": {"fn": create_automation, "auto": False},
+    "update_automation": {"fn": update_automation, "auto": False},
+    "toggle_automation": {"fn": toggle_automation, "auto": False},
+    "delete_automation": {"fn": delete_automation, "auto": False},
 }
 
 

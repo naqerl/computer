@@ -31,6 +31,7 @@
 	"sidebar.remove": "Remove",
 	"sidebar.workspaceOptions": "Workspace options",
 	"sidebar.closeSidebar": "Close sidebar",
+	"sidebar.showMore": "Show more",
 
 	"bar.newFile": "New File",
 	"bar.newTerminal": "New Terminal",
