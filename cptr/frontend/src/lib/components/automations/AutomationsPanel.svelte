@@ -281,7 +281,7 @@
 						{:else if detail.has_webhook}
 							<!-- Webhook enabled, URL not available -->
 							<div class="flex items-center gap-1.5">
-								<span class="text-xs text-gray-700 dark:text-gray-300">Enabled</span>
+								<span class="text-[11px] text-gray-700 dark:text-gray-300">Enabled</span>
 								<span class="text-gray-300 dark:text-gray-600">·</span>
 								<button
 									class="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors duration-75"
