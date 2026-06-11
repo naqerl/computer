@@ -30,11 +30,19 @@
 	let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 	let resultsEl: HTMLDivElement | undefined = $state();
 
+	// Determine active workspace from the URL, not the store.
+	// When on /automations or other non-workspace pages, $currentWorkspace
+	// retains the last workspace but we should search across all.
+	const urlWorkspacePath = $derived($page.url.searchParams.get('workspace'));
+	const effectiveWorkspace = $derived(
+		urlWorkspacePath ? $currentWorkspace : null
+	);
+
 	// Show recents when no query, search results when query exists
 	const showingRecents = $derived(!query.trim());
 	const filteredRecents = $derived(
-		$currentWorkspace
-			? recentChats.filter((c) => c.workspace === $currentWorkspace!.path)
+		effectiveWorkspace
+			? recentChats.filter((c) => c.workspace === effectiveWorkspace!.path)
 			: recentChats
 	);
 	const displayedChats = $derived(showingRecents ? filteredRecents : chatResults);
@@ -71,11 +79,11 @@
 		debounceTimer = setTimeout(() => doSearch(query), 250);
 	});
 
-	// When a workspace is active, scope to files from that workspace only
-	const isWorkspaceScoped = $derived(!!$currentWorkspace);
+	// When a workspace is explicitly active via URL, scope to files from that workspace only
+	const isWorkspaceScoped = $derived(!!effectiveWorkspace);
 
 	async function doSearch(q: string) {
-		const activeWs = $currentWorkspace;
+		const activeWs = effectiveWorkspace;
 
 		if (activeWs) {
 			// Workspace active: search chats + files scoped to this workspace
