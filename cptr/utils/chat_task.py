@@ -729,6 +729,9 @@ async def run_chat_task(
         last_usage: dict | None = None  # real usage from last API call
         new_messages_since: int = 0  # messages appended since last API call
 
+        # Request params: arbitrary key-value pairs merged into the API request body
+        request_params = chat_params.get("request_params") or None
+
         for _iteration in range(CHAT_MAX_ITERATIONS):
             # ── Context compaction: summarize older messages if too large ──
             if should_compact(messages, system, last_usage, new_messages_since):
@@ -768,11 +771,11 @@ async def run_chat_task(
             )
 
             if provider == "anthropic":
-                stream = stream_anthropic(form_data, base_url, api_key)
+                stream = stream_anthropic(form_data, base_url, api_key, request_params=request_params)
             elif connection.get("api_type") == "responses":
-                stream = stream_openai_responses(form_data, base_url, api_key)
+                stream = stream_openai_responses(form_data, base_url, api_key, request_params=request_params)
             else:
-                stream = stream_openai_completions(form_data, base_url, api_key)
+                stream = stream_openai_completions(form_data, base_url, api_key, request_params=request_params)
 
             restart = False
 

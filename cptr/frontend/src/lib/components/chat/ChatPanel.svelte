@@ -29,7 +29,8 @@
 		toolApprovalMode,
 		planMode,
 		streamingBehavior,
-		selectedModelId
+		selectedModelId,
+		requestParams
 	} from '$lib/stores';
 
 	import ChatInput from './ChatInput.svelte';
@@ -552,7 +553,7 @@
 						workspace,
 						chatId,
 						parentId,
-						{ tool_approval_mode: mode, plan_mode: get(planMode) },
+						{ tool_approval_mode: mode, plan_mode: get(planMode), request_params: get(requestParams) },
 						undefined,
 						files
 					);
@@ -617,7 +618,7 @@
 				workspace,
 				chatId ?? undefined,
 				parentId,
-				{ tool_approval_mode: mode, plan_mode: get(planMode) },
+				{ tool_approval_mode: mode, plan_mode: get(planMode), request_params: get(requestParams) },
 				undefined,
 				files
 			);
@@ -778,7 +779,8 @@
 			const mode = get(toolApprovalMode);
 			const result = await apiSendMessage('', selectedModel, workspace, chatId, msg.parent_id, {
 				tool_approval_mode: mode,
-				plan_mode: get(planMode)
+				plan_mode: get(planMode),
+				request_params: get(requestParams)
 			});
 			if (result.assistant_message) {
 				allMessages = [...allMessages, result.assistant_message];
@@ -821,7 +823,7 @@
 					workspace,
 					chatId,
 					msg.parent_id,
-					{ tool_approval_mode: get(toolApprovalMode), plan_mode: get(planMode) }
+					{ tool_approval_mode: get(toolApprovalMode), plan_mode: get(planMode), request_params: get(requestParams) }
 				);
 				if (result.user_message && result.assistant_message) {
 					allMessages = [...allMessages, result.user_message, result.assistant_message];

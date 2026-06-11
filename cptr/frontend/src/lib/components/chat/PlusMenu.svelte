@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { toolApprovalMode, planMode, type ToolApprovalMode } from '$lib/stores';
+	import { toolApprovalMode, planMode, requestParams, type ToolApprovalMode } from '$lib/stores';
 	import { tooltip } from '$lib/tooltip';
 	import Icon from '../Icon.svelte';
 	import ToggleSwitch from '../common/ToggleSwitch.svelte';
@@ -12,7 +12,7 @@
 	let { onfiles, oncapture }: Props = $props();
 
 	let open = $state(false);
-	let tab = $state<'' | 'tools'>('');
+	let tab = $state<'' | 'tools' | 'request_params'>('');
 	let btnEl: HTMLButtonElement | undefined = $state();
 	let menuEl: HTMLDivElement | undefined = $state();
 	let inputEl: HTMLInputElement | undefined = $state();
@@ -29,6 +29,44 @@
 	const currentModeLabel = $derived(
 		modes.find((m) => m.value === $toolApprovalMode)?.label ?? 'Tool permissions'
 	);
+
+	// ── Request params state ────────────────────────
+	let paramRows = $state<Array<{ key: string; value: string }>>(
+		Object.entries($requestParams).map(([key, value]) => ({
+			key,
+			value: typeof value === 'object' ? JSON.stringify(value) : String(value)
+		}))
+	);
+
+	const paramCount = $derived(
+		paramRows.filter((r) => r.key.trim()).length
+	);
+
+	const canAddParam = $derived(
+		paramRows.length === 0 || paramRows.every((r) => r.key.trim() || r.value.trim())
+	);
+
+	function addParamRow() {
+		paramRows = [...paramRows, { key: '', value: '' }];
+	}
+
+	function removeParamRow(index: number) {
+		paramRows = paramRows.filter((_, i) => i !== index);
+		syncParams();
+	}
+
+	function syncParams() {
+		const result: Record<string, unknown> = {};
+		for (const { key, value } of paramRows) {
+			if (!key.trim()) continue;
+			try {
+				result[key.trim()] = JSON.parse(value);
+			} catch {
+				result[key.trim()] = value;
+			}
+		}
+		requestParams.set(result);
+	}
 
 	function toggle() {
 		open = !open;
@@ -129,7 +167,15 @@
 		if (!open) {
 			ready = false;
 			tab = '';
+			return;
 		}
+		// Keep menu anchored on resize/scroll while open
+		window.addEventListener('resize', updatePosition);
+		window.addEventListener('scroll', updatePosition, true);
+		return () => {
+			window.removeEventListener('resize', updatePosition);
+			window.removeEventListener('scroll', updatePosition, true);
+		};
 	});
 </script>
 
@@ -268,6 +314,31 @@
 					>
 					<Icon name="chevron-right" size={12} class="shrink-0 text-gray-400 dark:text-gray-500" />
 				</button>
+
+				<div class="h-px bg-gray-100/50 dark:bg-white/3 mx-1 my-0.5"></div>
+
+				<button
+					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
+					onclick={() => (tab = 'request_params')}
+				>
+					<svg
+						class="size-3.5 shrink-0"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="1.5"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<circle cx="12" cy="12" r="3" />
+						<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+					</svg>
+					<span class="flex-1 text-left truncate">Parameters</span>
+					{#if paramCount > 0}
+						<span class="text-[10px] text-gray-400 dark:text-gray-500">{paramCount}</span>
+					{/if}
+					<Icon name="chevron-right" size={12} class="shrink-0 text-gray-400 dark:text-gray-500" />
+				</button>
 			</div>
 		{:else if tab === 'tools'}
 			<!-- Tool permissions submenu -->
@@ -307,6 +378,70 @@
 						{/if}
 					</button>
 				{/each}
+			</div>
+		{:else if tab === 'request_params'}
+			<!-- Request params submenu -->
+			<div class="plus-menu-slide-in-right">
+				<button
+					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75"
+					onclick={() => (tab = '')}
+				>
+					<Icon name="chevron-left" size={12} />
+					<span class="flex-1 text-left font-medium">Parameters</span>
+				</button>
+
+				<div class="h-px bg-gray-100/50 dark:bg-white/3 mx-1 my-0.5"></div>
+
+				{#if paramRows.length === 0}
+					<p class="px-2 h-7 flex items-center justify-center text-[11px] text-gray-400 dark:text-gray-500">No parameters configured</p>
+				{:else}
+					<div class="px-0.5 py-0.5 flex flex-col max-h-48 overflow-y-auto">
+						{#each paramRows as row, i}
+							<div class="group flex items-center gap-1 px-1.5 h-7">
+								<input
+									type="text"
+									placeholder="key"
+									bind:value={row.key}
+									onblur={syncParams}
+									autocomplete="off"
+									spellcheck="false"
+									class="w-[72px] shrink-0 bg-transparent text-[11px] font-mono text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none"
+								/>
+								<input
+									type="text"
+									placeholder="value"
+									bind:value={row.value}
+									onblur={syncParams}
+									autocomplete="off"
+									spellcheck="false"
+									class="flex-1 min-w-0 bg-transparent text-[11px] font-mono text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-600 outline-none"
+								/>
+								<button
+									type="button"
+									onclick={() => removeParamRow(i)}
+									class="shrink-0 p-0.5 text-gray-300 dark:text-gray-700 opacity-0 group-hover:opacity-100 hover:text-gray-500 dark:hover:text-gray-400 transition-all"
+									aria-label="Remove parameter"
+								>
+									<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="size-3">
+										<path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z"/>
+									</svg>
+								</button>
+							</div>
+						{/each}
+					</div>
+				{/if}
+
+				<button
+					class="flex items-center gap-2 w-full h-7 px-2 rounded-xl text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white transition-colors duration-75 disabled:opacity-30 disabled:pointer-events-none"
+					onclick={addParamRow}
+					disabled={!canAddParam}
+				>
+					<svg class="size-3 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<line x1="12" y1="5" x2="12" y2="19" />
+						<line x1="5" y1="12" x2="19" y2="12" />
+					</svg>
+					<span class="flex-1 text-left">Add parameter</span>
+				</button>
 			</div>
 		{/if}
 	</div>
