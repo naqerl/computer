@@ -726,9 +726,12 @@ async def run_chat_task(
         if "tool_approval_mode" not in chat_params and "auto_approve_tools" in chat_params:
             approval_mode = "full" if chat_params["auto_approve_tools"] else "auto"
 
+        last_usage: dict | None = None  # real usage from last API call
+        new_messages_since: int = 0  # messages appended since last API call
+
         for _iteration in range(CHAT_MAX_ITERATIONS):
             # ── Context compaction: summarize older messages if too large ──
-            if should_compact(messages, system):
+            if should_compact(messages, system, last_usage, new_messages_since):
                 target_keep = max(2, len(messages) * 2 // 5)
                 split_idx = _find_safe_split(messages, target_keep)
                 drop_zone = messages[:split_idx]
@@ -749,6 +752,8 @@ async def run_chat_task(
                 system = _load_system_prompt(workspace)
                 system += f"\n\n[CONVERSATION SUMMARY]\n{summary}"
                 messages = keep_zone
+                last_usage = None  # reset after compaction
+                new_messages_since = 0
 
                 logger.info(
                     "[task %s] compacted: dropped %d msgs, kept %d, summary=%d chars",
@@ -829,6 +834,7 @@ async def run_chat_task(
 
                         # Append to messages for next iteration
                         _append_tool_to_messages(messages, event, result, provider)
+                        new_messages_since += 2  # tool_call + tool_result
                         restart = True
                         break
 
@@ -852,6 +858,8 @@ async def run_chat_task(
                 elif event["type"] == "usage":
                     _flush_text()
                     usage = {k: v for k, v in event.items() if k != "type"}
+                    last_usage = usage
+                    new_messages_since = 0
                     logger.info(
                         "[task %s] save (usage): content=%d chars, output=%d items, types=%s",
                         message_id[:8],

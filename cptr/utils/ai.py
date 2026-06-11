@@ -234,11 +234,17 @@ async def stream_anthropic(
                     logger.info("[stream] anthropic status=%s", resp.status_code)
                     resp.raise_for_status()
                     current_block: dict = {}
+                    usage_data: dict = {}
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: "):
                             continue
                         event = json.loads(line[6:])
                         etype = event.get("type")
+
+                        if etype == "message_start":
+                            msg_usage = event.get("message", {}).get("usage", {})
+                            if msg_usage:
+                                usage_data["input_tokens"] = msg_usage.get("input_tokens", 0)
 
                         if etype == "content_block_start":
                             block = event["content_block"]
@@ -267,10 +273,11 @@ async def stream_anthropic(
                                 }
 
                         elif etype == "message_delta":
-                            usage = event.get("usage", {})
-                            if usage:
+                            delta_usage = event.get("usage", {})
+                            if delta_usage:
+                                usage_data["output_tokens"] = delta_usage.get("output_tokens", 0)
                                 emitted = True
-                                yield {"type": "usage", **usage}
+                                yield {"type": "usage", **usage_data}
 
                         elif etype == "message_stop":
                             emitted = True
@@ -392,8 +399,13 @@ async def stream_openai_completions(
                                 }
 
                         if chunk.get("usage"):
+                            raw = chunk["usage"]
                             emitted = True
-                            yield {"type": "usage", **chunk["usage"]}
+                            yield {
+                                "type": "usage",
+                                "input_tokens": raw.get("prompt_tokens", 0),
+                                "output_tokens": raw.get("completion_tokens", 0),
+                            }
 
                     emitted = True
                     yield {"type": "done"}
