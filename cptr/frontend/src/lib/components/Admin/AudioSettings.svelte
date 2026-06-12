@@ -13,6 +13,7 @@
 	// Config state
 	let voiceMemosEnabled = $state(false);
 	let transcribeEnabled = $state(true);
+	let quality = $state<'high' | 'medium' | 'low'>('high');
 	let sttBaseUrl = $state('https://api.openai.com/v1');
 	let sttApiKey = $state('');
 	let sttModel = $state('whisper-1');
@@ -23,6 +24,9 @@
 			const config = await getAdminConfig();
 			voiceMemosEnabled = config['audio.voice_memos_enabled'] === true;
 			transcribeEnabled = config['audio.transcribe_enabled'] !== false;
+			const q = config['audio.recording_quality'];
+			if (q === 'medium' || q === 'low') quality = q;
+			else quality = 'high';
 			sttBaseUrl = (config['audio.stt_base_url'] as string) || 'https://api.openai.com/v1';
 			sttModel = (config['audio.stt_model'] as string) || 'whisper-1';
 			hasExistingKey = !!config['audio.stt_api_key'];
@@ -36,6 +40,7 @@
 			const cfg: Record<string, unknown> = {
 				'audio.voice_memos_enabled': voiceMemosEnabled,
 				'audio.transcribe_enabled': transcribeEnabled,
+				'audio.recording_quality': quality,
 				'audio.stt_base_url': sttBaseUrl,
 				'audio.stt_model': sttModel
 			};
@@ -78,6 +83,21 @@
 			</label>
 			<p class="text-[11px] text-gray-400 dark:text-gray-600 -mt-1">
 				{transcribeEnabled ? 'Recordings are transcribed to markdown via STT.' : 'Recordings are saved as audio only.'}
+			</p>
+
+			<div class="flex items-center justify-between">
+				<span class="text-xs text-gray-600 dark:text-gray-400">Recording quality</span>
+				<select
+					bind:value={quality}
+					class="bg-transparent text-xs text-gray-600 dark:text-gray-400 outline-none cursor-pointer"
+				>
+					<option value="high">High (128kbps)</option>
+					<option value="medium">Medium (64kbps)</option>
+					<option value="low">Low (32kbps)</option>
+				</select>
+			</div>
+			<p class="text-[11px] text-gray-400 dark:text-gray-600 -mt-1">
+				{quality === 'high' ? 'Best quality, larger files.' : quality === 'medium' ? 'Balanced quality and size.' : 'Smallest files, optimized for speech.'}
 			</p>
 		</div>
 

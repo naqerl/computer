@@ -6,7 +6,7 @@
 	import Spinner from './common/Spinner.svelte';
 	import { writeFile } from '$lib/apis/files';
 	import { fetchJSON } from '$lib/apis';
-	import { transcribeEnabled } from '$lib/stores/audio';
+	import { transcribeEnabled, recordingQuality, QUALITY_BITRATES } from '$lib/stores/audio';
 
 	interface Props {
 		workspace: string;
@@ -107,7 +107,10 @@
 			tick();
 
 			chunks = [];
-			mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType() });
+			mediaRecorder = new MediaRecorder(stream, {
+				mimeType: mimeType(),
+				audioBitsPerSecond: QUALITY_BITRATES[get(recordingQuality)]
+			});
 			mediaRecorder.ondataavailable = (e) => {
 				if (e.data.size > 0) chunks.push(e.data);
 			};
