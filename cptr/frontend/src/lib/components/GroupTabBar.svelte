@@ -21,14 +21,14 @@
 	} from '$lib/stores';
 	import { openChatTab } from '$lib/stores';
 	import { chatEnabled, streamingChatTabs } from '$lib/stores/chat';
-	import { voiceNotesEnabled, showVoiceNote } from '$lib/stores/audio';
+	import { voiceMemosEnabled, showVoiceMemo } from '$lib/stores/audio';
 	import { keybindings, formatChord } from '$lib/stores/keybindings';
 	import Icon from './Icon.svelte';
 	import Spinner from './common/Spinner.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import { tooltip } from '$lib/tooltip';
 	import { t } from '$lib/i18n';
-	import VoiceNoteModal from './VoiceNoteModal.svelte';
+	import VoiceMemoModal from './VoiceMemoModal.svelte';
 
 	interface Props {
 		group: EditorGroup;
@@ -162,14 +162,14 @@
 				openTerminalTab(group.id);
 			}
 		},
-		...($voiceNotesEnabled
+		...($voiceMemosEnabled
 			? [
 					{
-						label: 'Voice Note',
+						label: 'Voice Memo',
 						icon: 'microphone',
-						shortcut: formatChord($keybindings.voiceNote),
+						shortcut: formatChord($keybindings.voiceMemo),
 						onclick: () => {
-							showVoiceNote.set(true);
+							showVoiceMemo.set(true);
 						}
 					}
 				]
@@ -405,11 +405,11 @@
 	/>
 {/if}
 
-{#if $showVoiceNote}
-	<VoiceNoteModal
+{#if $showVoiceMemo}
+	<VoiceMemoModal
 		workspace={$activeWorkspace?.path ?? ''}
 		directory={$activeWorkspace?.fileBrowserCwd ?? $activeWorkspace?.path ?? ''}
-		onclose={() => showVoiceNote.set(false)}
+		onclose={() => showVoiceMemo.set(false)}
 	/>
 {/if}
 

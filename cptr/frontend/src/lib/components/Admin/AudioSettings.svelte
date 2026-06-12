@@ -11,7 +11,7 @@
 	let saving = $state(false);
 
 	// Config state
-	let voiceNotesEnabled = $state(false);
+	let voiceMemosEnabled = $state(false);
 	let transcribeEnabled = $state(true);
 	let sttBaseUrl = $state('https://api.openai.com/v1');
 	let sttApiKey = $state('');
@@ -21,7 +21,7 @@
 	onMount(async () => {
 		try {
 			const config = await getAdminConfig();
-			voiceNotesEnabled = config['audio.voice_notes_enabled'] === true;
+			voiceMemosEnabled = config['audio.voice_memos_enabled'] === true;
 			transcribeEnabled = config['audio.transcribe_enabled'] !== false;
 			sttBaseUrl = (config['audio.stt_base_url'] as string) || 'https://api.openai.com/v1';
 			sttModel = (config['audio.stt_model'] as string) || 'whisper-1';
@@ -34,7 +34,7 @@
 		saving = true;
 		try {
 			const cfg: Record<string, unknown> = {
-				'audio.voice_notes_enabled': voiceNotesEnabled,
+				'audio.voice_memos_enabled': voiceMemosEnabled,
 				'audio.transcribe_enabled': transcribeEnabled,
 				'audio.stt_base_url': sttBaseUrl,
 				'audio.stt_model': sttModel
@@ -61,12 +61,12 @@
 		<div class="flex justify-center py-8"><Spinner size={16} /></div>
 	{:else}
 		<!-- Voice Notes -->
-		<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2">Voice Notes</h3>
+		<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2">Voice Memos</h3>
 
 		<div class="flex flex-col gap-2.5">
 			<label class="flex items-center justify-between cursor-pointer">
-				<span class="text-xs text-gray-600 dark:text-gray-400">Enable Voice Notes</span>
-				<ToggleSwitch value={voiceNotesEnabled} onchange={(v) => { voiceNotesEnabled = v; }} />
+				<span class="text-xs text-gray-600 dark:text-gray-400">Enable Voice Memos</span>
+				<ToggleSwitch value={voiceMemosEnabled} onchange={(v) => { voiceMemosEnabled = v; }} />
 			</label>
 			<p class="text-[11px] text-gray-400 dark:text-gray-600 -mt-1">
 				Record voice memos from the "+" menu.

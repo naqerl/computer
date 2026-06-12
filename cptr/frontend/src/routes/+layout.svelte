@@ -225,10 +225,10 @@
 			toggleSearch: () => {
 				showSearch.update((v) => !v);
 			},
-			toggleVoiceNote: () => {
-				import('$lib/stores/audio').then(({ voiceNotesEnabled, showVoiceNote }) => {
+			toggleVoiceMemo: () => {
+				import('$lib/stores/audio').then(({ voiceMemosEnabled, showVoiceMemo }) => {
 					import('svelte/store').then(({ get }) => {
-						if (get(voiceNotesEnabled)) showVoiceNote.update((v) => !v);
+						if (get(voiceMemosEnabled)) showVoiceMemo.update((v) => !v);
 					});
 				});
 			}
