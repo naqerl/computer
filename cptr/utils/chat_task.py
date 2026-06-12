@@ -1000,6 +1000,8 @@ async def run_chat_task(
                 elif event["type"] == "usage":
                     _flush_text()
                     usage = {k: v for k, v in event.items() if k != "type"}
+                    if "total_tokens" not in usage:
+                        usage["total_tokens"] = usage.get("input_tokens", 0) + usage.get("output_tokens", 0)
                     last_usage = usage
                     new_messages_since = 0
                     logger.info(
