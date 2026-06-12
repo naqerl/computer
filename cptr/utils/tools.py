@@ -939,6 +939,158 @@ async def view_skill(
     return format_skill_content(skill)
 
 
+# ── Browser tools ────────────────────────────────────────────
+
+
+async def _get_browser_config() -> dict:
+    """Read browser config from DB."""
+    try:
+        from cptr.models import Config
+
+        return {
+            "enabled": await Config.get("browser.enabled") or False,
+            "provider": await Config.get("browser.provider") or "local",
+            "cdp_url": await Config.get("browser.cdp_url") or "http://localhost:9222",
+            "auto_launch": await Config.get("browser.auto_launch") if await Config.get("browser.auto_launch") is not None else True,
+            "session_timeout": int(await Config.get("browser.session_timeout_minutes") or 10),
+            "firecrawl_api_key": await Config.get("browser.firecrawl_api_key") or "",
+            "firecrawl_base_url": await Config.get("browser.firecrawl_base_url") or "https://api.firecrawl.dev",
+            "browser_use_api_key": await Config.get("browser.browser_use_api_key") or "",
+            "browser_use_base_url": await Config.get("browser.browser_use_base_url") or "https://api.browser-use.com",
+        }
+    except Exception:
+        return {"enabled": False, "provider": "local"}
+
+
+async def _get_cdp_session(chat_id: str) -> "CDPClient":
+    """Get or create a CDP session for the current chat."""
+    cfg = await _get_browser_config()
+    cdp_url = cfg["cdp_url"]
+
+    if cfg.get("auto_launch", True):
+        from cptr.utils.browser.launcher import ensure_browser
+
+        cdp_url = await ensure_browser(port=int(cdp_url.split(":")[-1]))
+
+    from cptr.utils.browser.session import session_manager
+
+    session_manager.set_timeout(cfg.get("session_timeout", 10))
+    return await session_manager.get_or_create(chat_id, cdp_url)
+
+
+async def browser_navigate(url: str, *, __context__: dict) -> str:
+    """Navigate to a URL in the browser. Returns the page title and status.
+    :param url: The URL to navigate to.
+    """
+    cfg = await _get_browser_config()
+    provider = cfg.get("provider", "local")
+
+    if provider == "firecrawl":
+        key = cfg.get("firecrawl_api_key", "")
+        if not key:
+            return "Error: Firecrawl API key not configured. Set it in Settings > Browser."
+        from cptr.utils.browser.firecrawl import scrape
+
+        content = await scrape(url, key, cfg.get("firecrawl_base_url", ""))
+        return f"Navigated to {url} (via Firecrawl)\n\n{content}"
+
+    if provider == "browser_use":
+        key = cfg.get("browser_use_api_key", "")
+        if not key:
+            return "Error: Browser-Use API key not configured. Set it in Settings > Browser."
+        from cptr.utils.browser.browser_use import browse
+
+        result = await browse(f"Navigate to {url} and describe what you see", key, cfg.get("browser_use_base_url", ""))
+        return f"Navigated to {url} (via Browser-Use)\n\n{result}"
+
+    # Local CDP
+    chat_id = __context__.get("chat_id", "default")
+    client = await _get_cdp_session(chat_id)
+    result = await client.navigate(url)
+    return f"Navigated to {url}\nTitle: {result.get('title', '')}"
+
+
+async def browser_snapshot(*, __context__: dict) -> str:
+    """Get the current page content. For local browser, returns an accessibility tree with ref IDs (@e1, @e2, etc.) that can be used with browser_click and browser_type. For cloud providers, returns page content as text."""
+    cfg = await _get_browser_config()
+    provider = cfg.get("provider", "local")
+
+    if provider in ("firecrawl", "browser_use"):
+        return "Snapshot is only meaningful after browser_navigate. The navigate result already contains the page content."
+
+    chat_id = __context__.get("chat_id", "default")
+    client = await _get_cdp_session(chat_id)
+    return await client.snapshot()
+
+
+async def browser_click(ref: str, *, __context__: dict) -> str:
+    """Click an element on the page identified by its ref ID from the snapshot (e.g. @e1).
+    :param ref: The ref ID of the element to click (e.g. @e1, @e5).
+    """
+    cfg = await _get_browser_config()
+    if cfg.get("provider", "local") != "local":
+        return "Error: browser_click requires Local CDP provider. Cloud providers (Firecrawl, Browser-Use) don't support interactive browsing. Switch to Local CDP in Settings > Browser."
+
+    chat_id = __context__.get("chat_id", "default")
+    client = await _get_cdp_session(chat_id)
+    await client.click(ref)
+    # Return updated snapshot so the AI sees the result
+    return await client.snapshot()
+
+
+async def browser_type(ref: str, text: str, *, __context__: dict) -> str:
+    """Type text into an input element identified by its ref ID from the snapshot.
+    :param ref: The ref ID of the input element (e.g. @e3).
+    :param text: The text to type.
+    """
+    cfg = await _get_browser_config()
+    if cfg.get("provider", "local") != "local":
+        return "Error: browser_type requires Local CDP provider. Switch to Local CDP in Settings > Browser."
+
+    chat_id = __context__.get("chat_id", "default")
+    client = await _get_cdp_session(chat_id)
+    await client.type_text(ref, text)
+    return await client.snapshot()
+
+
+async def browser_screenshot(*, __context__: dict) -> str:
+    """Take a screenshot of the current browser page. Saves the image to the workspace.
+    """
+    cfg = await _get_browser_config()
+    if cfg.get("provider", "local") != "local":
+        return "Error: browser_screenshot requires Local CDP provider."
+
+    chat_id = __context__.get("chat_id", "default")
+    client = await _get_cdp_session(chat_id)
+    png_bytes = await client.screenshot()
+
+    # Save to workspace
+    workspace = __context__.get("workspace", ".")
+    screenshots_dir = Path(workspace) / ".cptr" / "screenshots"
+    screenshots_dir.mkdir(parents=True, exist_ok=True)
+
+    import time
+
+    filename = f"screenshot_{int(time.time())}.png"
+    filepath = screenshots_dir / filename
+    filepath.write_bytes(png_bytes)
+
+    return f"Screenshot saved: {filepath}"
+
+
+async def browser_evaluate(javascript: str, *, __context__: dict) -> str:
+    """Execute JavaScript in the browser page and return the result.
+    :param javascript: The JavaScript expression to evaluate.
+    """
+    cfg = await _get_browser_config()
+    if cfg.get("provider", "local") != "local":
+        return "Error: browser_evaluate requires Local CDP provider."
+
+    chat_id = __context__.get("chat_id", "default")
+    client = await _get_cdp_session(chat_id)
+    return await client.evaluate(javascript)
+
+
 # ── Registry ────────────────────────────────────────────────
 
 TOOLS: dict[str, dict] = {
@@ -962,6 +1114,16 @@ TOOLS: dict[str, dict] = {
     "update_automation": {"fn": update_automation, "auto": False},
     "toggle_automation": {"fn": toggle_automation, "auto": False},
     "delete_automation": {"fn": delete_automation, "auto": False},
+}
+
+# Browser tools — registered conditionally based on browser.enabled config
+BROWSER_TOOLS: dict[str, dict] = {
+    "browser_navigate": {"fn": browser_navigate, "auto": False},
+    "browser_snapshot": {"fn": browser_snapshot, "auto": True},
+    "browser_click": {"fn": browser_click, "auto": False},
+    "browser_type": {"fn": browser_type, "auto": False},
+    "browser_screenshot": {"fn": browser_screenshot, "auto": True},
+    "browser_evaluate": {"fn": browser_evaluate, "auto": False},
 }
 
 
@@ -1017,14 +1179,25 @@ def _fn_to_schema(name: str, fn) -> dict:
     }
 
 
-def get_tool_list() -> list[dict]:
-    """Return tool schemas for the LLM."""
-    return [_fn_to_schema(name, t["fn"]) for name, t in TOOLS.items()]
+async def get_tool_list() -> list[dict]:
+    """Return tool schemas for the LLM.
+
+    Automatically includes browser tools when browser.enabled is true in config.
+    """
+    tools = dict(TOOLS)
+    try:
+        from cptr.models import Config
+
+        if (await Config.get("browser.enabled")) in (True, "true", "1"):
+            tools.update(BROWSER_TOOLS)
+    except Exception:
+        pass
+    return [_fn_to_schema(name, t["fn"]) for name, t in tools.items()]
 
 
 async def execute_tool(name: str, args: dict, __context__: dict) -> str:
     """Execute a tool by name, injecting execution context."""
-    info = TOOLS.get(name)
+    info = TOOLS.get(name) or BROWSER_TOOLS.get(name)
     if not info:
         return f"Error: unknown tool: {name}"
     fn = info["fn"]

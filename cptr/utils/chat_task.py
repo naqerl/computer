@@ -798,7 +798,7 @@ async def run_chat_task(
             system += f"\n\n[CONVERSATION SUMMARY]\n{loaded_summary}"
         if regeneration_prompt:
             messages.append({"role": "user", "content": regeneration_prompt})
-        tools = get_tool_list()
+        tools = await get_tool_list()
 
         # Remove view_skill tool if no skills are available
         skills = discover_skills(workspace)
@@ -955,7 +955,7 @@ async def run_chat_task(
                         if name == "create_artifact":
                             result = await create_artifact(**event["arguments"], workspace=workspace)
                         else:
-                            result = await execute_tool(name, event["arguments"], {"workspace": workspace, "user_id": user_id, "model_id": model})
+                            result = await execute_tool(name, event["arguments"], {"workspace": workspace, "user_id": user_id, "model_id": model, "chat_id": chat_id})
 
                         # Update status to completed
                         item["status"] = "completed"
