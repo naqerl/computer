@@ -495,17 +495,19 @@ def _to_responses_input(messages: list[dict], instructions: str) -> list[dict]:
                     "type": "function_call_output",
                     "call_id": m.get("tool_call_id", ""),
                     "output": content,
+                    "status": "completed",
                 }
             )
         elif role == "assistant" and m.get("tool_calls"):
             for tc in m["tool_calls"]:
+                args = tc["function"].get("arguments", "{}")
                 items.append(
                     {
                         "type": "function_call",
                         "id": tc.get("fc_id", tc.get("id", "")),
                         "call_id": tc.get("id", ""),
                         "name": tc["function"]["name"],
-                        "arguments": tc["function"].get("arguments", "{}"),
+                        "arguments": args if isinstance(args, str) else json.dumps(args),
                         "status": "completed",
                     }
                 )
@@ -517,15 +519,14 @@ def _to_responses_input(messages: list[dict], instructions: str) -> list[dict]:
                     if block.get("type") == "text":
                         formatted_content.append({"type": "input_text", "text": block.get("text", "")})
                     elif block.get("type") == "image":
-                        # Not all models support input_image, but this is the Responses API spec
                         data_uri = f"data:{block.get('media_type', 'image/jpeg')};base64,{block.get('base64', '')}"
                         formatted_content.append({
                             "type": "input_image",
                             "image_url": data_uri
                         })
-                items.append({"role": role, "content": formatted_content})
+                items.append({"type": "message", "role": role, "content": formatted_content})
             else:
-                items.append({"role": role, "content": content})
+                items.append({"type": "message", "role": role, "content": content})
     return items
 
 
@@ -576,7 +577,10 @@ async def stream_openai_responses(
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: "):
                             continue
-                        event = json.loads(line[6:])
+                        raw = line[6:]
+                        if raw == "[DONE]":
+                            break
+                        event = json.loads(raw)
                         etype = event.get("type")
 
                         if etype == "response.output_text.delta":
@@ -594,6 +598,11 @@ async def stream_openai_responses(
                                     "name": item["name"],
                                     "arguments": json.loads(item["arguments"]),
                                 }
+
+                        elif etype == "response.failed":
+                            error = event.get("response", {}).get("error", {})
+                            msg = error.get("message", "Response failed")
+                            raise RuntimeError(f"Responses API error: {msg}")
 
                         elif etype == "response.completed":
                             usage = event.get("response", {}).get("usage", {})
