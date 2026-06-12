@@ -21,12 +21,14 @@
 	} from '$lib/stores';
 	import { openChatTab } from '$lib/stores';
 	import { chatEnabled, streamingChatTabs } from '$lib/stores/chat';
+	import { voiceNotesEnabled, showVoiceNote } from '$lib/stores/audio';
 	import { keybindings, formatChord } from '$lib/stores/keybindings';
 	import Icon from './Icon.svelte';
 	import Spinner from './common/Spinner.svelte';
 	import DropdownMenu from './DropdownMenu.svelte';
 	import { tooltip } from '$lib/tooltip';
 	import { t } from '$lib/i18n';
+	import VoiceNoteModal from './VoiceNoteModal.svelte';
 
 	interface Props {
 		group: EditorGroup;
@@ -159,7 +161,19 @@
 			onclick: () => {
 				openTerminalTab(group.id);
 			}
-		}
+		},
+		...($voiceNotesEnabled
+			? [
+					{
+						label: 'Voice Note',
+						icon: 'microphone',
+						shortcut: formatChord($keybindings.voiceNote),
+						onclick: () => {
+							showVoiceNote.set(true);
+						}
+					}
+				]
+			: [])
 	]);
 
 	const contextMenuItems = $derived.by(() => {
@@ -388,6 +402,14 @@
 		items={splitMenuItems}
 		anchor={splitBtnEl}
 		onclose={() => (showSplitMenu = false)}
+	/>
+{/if}
+
+{#if $showVoiceNote}
+	<VoiceNoteModal
+		workspace={$activeWorkspace?.path ?? ''}
+		directory={$activeWorkspace?.fileBrowserCwd ?? $activeWorkspace?.path ?? ''}
+		onclose={() => showVoiceNote.set(false)}
 	/>
 {/if}
 
