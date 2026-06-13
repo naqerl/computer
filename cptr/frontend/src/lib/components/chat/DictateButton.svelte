@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { t } from '$lib/i18n';
 	interface Props {
 		ontext: (text: string) => void;
 	}
@@ -15,7 +16,7 @@
 		const SpeechRecognition =
 			(window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
 		if (!SpeechRecognition) {
-			alert('Speech recognition not supported in this browser.');
+			alert($t('chat.dictate.unsupported'));
 			return;
 		}
 		recognition = new SpeechRecognition();

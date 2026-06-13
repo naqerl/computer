@@ -2,7 +2,6 @@
 	import {
 		keybindings,
 		ACTION_IDS,
-		ACTION_LABELS,
 		DEFAULT_KEYBINDINGS,
 		formatChord,
 		eventToChord,
@@ -24,6 +23,22 @@
 		openSettings: $t('keyboard.openSettings'),
 		toggleSplit: $t('keyboard.toggleSplit'),
 		toggleSidebar: $t('keyboard.toggleSidebar')
+	});
+
+	/** Translated action labels for display. */
+	const ACTION_LABELS: Record<ActionId, string> = $derived({
+		newFile: $t('keyboard.action.newFile'),
+		newTerminal: $t('keyboard.action.newTerminal'),
+		newChat: $t('keyboard.action.newChat'),
+		closeTab: $t('keyboard.action.closeTab'),
+		nextTab: $t('keyboard.action.nextTab'),
+		prevTab: $t('keyboard.action.prevTab'),
+		quickOpen: $t('keyboard.action.quickOpen'),
+		searchAll: $t('keyboard.action.searchAll'),
+		openSettings: $t('keyboard.action.openSettings'),
+		toggleSplit: $t('keyboard.action.toggleSplit'),
+		toggleSidebar: $t('keyboard.action.toggleSidebar'),
+		voiceMemo: $t('keyboard.action.voiceMemo')
 	});
 
 	let recordingAction = $state<ActionId | null>(null);
@@ -130,7 +145,7 @@
 					{#if conflict}
 						<span
 							class="text-[9px] text-amber-500 ml-1"
-							title="Also bound to {ACTION_LABELS[conflict]}">!</span
+							title={$t('keyboard.conflict', { action: ACTION_LABELS[conflict] })}>!</span
 						>
 					{/if}
 				</div>

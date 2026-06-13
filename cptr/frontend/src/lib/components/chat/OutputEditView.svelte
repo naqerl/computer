@@ -198,13 +198,13 @@
 	function getItemLabel(di: DisplayItem): string {
 		switch (di.type) {
 			case 'message':
-				return 'Text';
+				return $t('chat.edit.text');
 			case 'reasoning':
-				return 'Thought';
+				return $t('chat.edit.thought');
 			case 'function_call':
-				return di.item.name ?? 'Tool';
+				return di.item.name ?? $t('chat.edit.tool');
 			default:
-				return 'Item';
+				return $t('chat.edit.item');
 		}
 	}
 </script>

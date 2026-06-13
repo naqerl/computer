@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ChatInfo } from '$lib/apis/chat';
+	import { t } from '$lib/i18n';
 	import ChatItem from '../common/ChatItem.svelte';
 	import DropdownMenu from '../DropdownMenu.svelte';
 	import Pagination from '../common/Pagination.svelte';
@@ -48,12 +49,12 @@
 		const now = new Date();
 		const diffMs = now.getTime() - d.getTime();
 		const diffM = Math.floor(diffMs / 60000);
-		if (diffM < 1) return 'Just now';
-		if (diffM < 60) return `${diffM}m ago`;
+		if (diffM < 1) return $t('chat.history.justNow');
+		if (diffM < 60) return $t('chat.history.minutesAgo', { count: diffM });
 		const diffH = Math.floor(diffM / 60);
-		if (diffH < 24) return `${diffH}h ago`;
+		if (diffH < 24) return $t('chat.history.hoursAgo', { count: diffH });
 		const diffD = Math.floor(diffH / 24);
-		if (diffD < 7) return `${diffD}d ago`;
+		if (diffD < 7) return $t('chat.history.daysAgo', { count: diffD });
 		return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 	}
 
@@ -100,7 +101,7 @@
 					class="flex-1 flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
 					onclick={() => onsort?.('title')}
 				>
-					Title
+					{$t('chat.history.title')}
 					{#if sortBy === 'title'}
 						{#if sortDir === 'asc'}
 							{@render chevronUp()}
@@ -115,7 +116,7 @@
 					class="shrink-0 flex items-center gap-1 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
 					onclick={() => onsort?.('updated_at')}
 				>
-					Updated
+					{$t('chat.history.updated')}
 					{#if sortBy === 'updated_at'}
 						{#if sortDir === 'asc'}
 							{@render chevronUp()}
@@ -148,7 +149,7 @@
 		align="end"
 		items={[
 			{
-				label: 'Delete',
+				label: $t('chat.history.delete'),
 				icon: 'trash',
 				onclick: () => {
 					if (menuChatId) ondelete(menuChatId);

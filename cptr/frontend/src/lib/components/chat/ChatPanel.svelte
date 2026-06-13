@@ -291,7 +291,7 @@
 	async function openChat(id: string) {
 		await loadChat(id);
 		const chat = previousChats.find((c) => c.id === id);
-		if (tabId) updateTab(tabId, id, chat?.title || 'Chat');
+		if (tabId) updateTab(tabId, id, chat?.title || $t('chat.fallbackTitle'));
 	}
 
 	async function deleteChat(id: string) {
@@ -613,7 +613,7 @@
 
 		// Update tab label instantly for new chats
 		if (isNew && tabId) {
-			updateTab(tabId, `pending-${tempId}`, text.slice(0, 40) || 'Chat');
+			updateTab(tabId, `pending-${tempId}`, text.slice(0, 40) || $t('chat.fallbackTitle'));
 		}
 
 		try {
@@ -640,7 +640,7 @@
 			currentMessageId = result.message_id;
 
 			if (isNew && tabId) {
-				updateTab(tabId, result.chat_id, text.slice(0, 40) || 'Chat');
+				updateTab(tabId, result.chat_id, text.slice(0, 40) || $t('chat.fallbackTitle'));
 			}
 		} catch (e) {
 			console.error('[chat] send error', e);
