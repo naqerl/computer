@@ -521,7 +521,7 @@
 												<path
 													stroke-linecap="round"
 													stroke-linejoin="round"
-													d="M11.42 15.17l-5.645 5.646a.5.5 0 01-.707 0l-1.884-1.884a.5.5 0 010-.707l5.646-5.645m6.607-6.607l-5.645 5.646m5.645-5.646a2.121 2.121 0 013 3l-5.646 5.646"
+													d="M21.75 6.75a4.5 4.5 0 0 1-4.884 4.484c-1.076-.091-2.264.071-2.95.904l-7.152 8.684a2.548 2.548 0 1 1-3.586-3.586l8.684-7.152c.833-.686.995-1.874.904-2.95a4.5 4.5 0 0 1 6.336-4.486l-3.276 3.276a3.004 3.004 0 0 0 2.25 2.25l3.276-3.276c.256.565.398 1.192.398 1.852Z"
 												/>
 											</svg>
 										</div>
@@ -569,7 +569,7 @@
 											{@const args = item.arguments || {}}
 											{@const toolName = item.name}
 											{@const callId = item.call_id || toolName}
-											{@const isExecuting = item.status === 'running' || (!item.status && !done)}
+											{@const isExecuting = item.status === 'running' || item.status === 'in_progress' || (!item.status && !done)}
 											{@const isDone = item.status === 'completed'}
 											{@const isRejected = item.status === 'rejected'}
 											{@const isPending = item.status === 'pending'}
@@ -665,7 +665,7 @@
 																	<path
 																		stroke-linecap="round"
 																		stroke-linejoin="round"
-																		d="M11.42 15.17l-5.645 5.646a.5.5 0 01-.707 0l-1.884-1.884a.5.5 0 010-.707l5.646-5.645m6.607-6.607l-5.645 5.646m5.645-5.646a2.121 2.121 0 013 3l-5.646 5.646"
+																		d="M21.75 6.75a4.5 4.5 0 0 1-4.884 4.484c-1.076-.091-2.264.071-2.95.904l-7.152 8.684a2.548 2.548 0 1 1-3.586-3.586l8.684-7.152c.833-.686.995-1.874.904-2.95a4.5 4.5 0 0 1 6.336-4.486l-3.276 3.276a3.004 3.004 0 0 0 2.25 2.25l3.276-3.276c.256.565.398 1.192.398 1.852Z"
 																	/>
 																</svg>
 															</div>
