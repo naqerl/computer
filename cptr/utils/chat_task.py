@@ -1042,7 +1042,6 @@ async def run_chat_task(
                     pending_calls.append(event)
 
                 elif event["type"] == "usage":
-                    _flush_text()
                     usage = {k: v for k, v in event.items() if k != "type"}
                     if "total_tokens" not in usage:
                         usage["total_tokens"] = usage.get("input_tokens", 0) + usage.get(
@@ -1053,6 +1052,7 @@ async def run_chat_task(
 
                     if not pending_calls:
                         # No tool calls — final response, we're done
+                        _flush_text()
                         logger.info(
                             "[task %s] save (usage): content=%d chars, output=%d items, types=%s",
                             message_id[:8],
