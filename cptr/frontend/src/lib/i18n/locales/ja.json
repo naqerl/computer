@@ -569,5 +569,17 @@
 	"admin.gateway.newKey": "新しいAPIキーが作成されました。今すぐコピーしてください",
 	"admin.gateway.noKeys": "APIキーがまだありません",
 	"admin.gateway.title": "APIゲートウェイ",
-	"chat.greeting": "何かお手伝いできますか？"
+	"chat.greeting": "何かお手伝いできますか？",
+
+	"admin.subagents": "サブエージェント",
+	"admin.subagentsEnabled": "サブエージェントを有効にする",
+	"admin.subagentsHint": "AIがサブエージェントにタスクを委任できるようにします。各サブエージェントはフルツールアクセス付きの実際のチャットを作成します。追加のLLMコールを使用します。",
+	"admin.subagentsMaxConcurrent": "最大同時実行数",
+	"admin.subagentsMaxConcurrentHint": "同時実行サブエージェント",
+	"admin.subagentsMaxIterations": "最大反復回数",
+	"admin.subagentsMaxIterationsHint": "サブエージェントあたりのツールループ",
+	"admin.subagentsMaxOutput": "最大出力",
+	"admin.subagentsSystemPrompt": "システムプロンプト",
+	"admin.subagentsSystemPromptPlaceholder": "あなたはサブエージェントです...",
+	"admin.subagentsSystemPromptHint": "組み込みデフォルトを使用する場合は空のままにしてください。"
 }

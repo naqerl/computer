@@ -569,5 +569,17 @@
 	"admin.gateway.newKey": "새 API 키가 생성되었습니다. 지금 복사하세요",
 	"admin.gateway.noKeys": "API 키가 아직 없습니다",
 	"admin.gateway.title": "API 게이트웨이",
-	"chat.greeting": "무엇을 도와드릴까요?"
+	"chat.greeting": "무엇을 도와드릴까요?",
+
+	"admin.subagents": "서브 에이전트",
+	"admin.subagentsEnabled": "서브 에이전트 활성화",
+	"admin.subagentsHint": "AI가 서브 에이전트에 작업을 위임할 수 있게 합니다. 각 서브 에이전트는 전체 도구 액세스 권한이 있는 실제 채팅을 생성합니다. 추가 LLM 호출을 사용합니다.",
+	"admin.subagentsMaxConcurrent": "최대 동시 실행",
+	"admin.subagentsMaxConcurrentHint": "동시 서브 에이전트",
+	"admin.subagentsMaxIterations": "최대 반복 횟수",
+	"admin.subagentsMaxIterationsHint": "서브 에이전트당 도구 루프",
+	"admin.subagentsMaxOutput": "최대 출력",
+	"admin.subagentsSystemPrompt": "시스템 프롬프트",
+	"admin.subagentsSystemPromptPlaceholder": "당신은 서브 에이전트입니다...",
+	"admin.subagentsSystemPromptHint": "기본값을 사용하려면 비워두세요."
 }

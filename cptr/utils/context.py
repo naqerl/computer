@@ -63,11 +63,16 @@ def should_compact(
 
 
 def _get_threshold() -> int:
-    """Read threshold: config.toml > env var/default."""
+    """Read threshold: app_config (admin UI) > config.toml [chat] > env var/default."""
     try:
         from cptr.utils.config import load_config
 
         config = load_config()
+        # Admin UI saves to [app_config] with dotted keys
+        val = config.get("app_config", {}).get("chat.compact_token_threshold")
+        if val is not None:
+            return int(val)
+        # Manual config.toml [chat] section
         val = config.get("chat", {}).get("compact_token_threshold")
         if val is not None:
             return int(val)

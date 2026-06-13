@@ -569,5 +569,17 @@
 	"admin.gateway.newKey": "Nueva clave API creada. Cópiala ahora",
 	"admin.gateway.noKeys": "Aún no hay claves API",
 	"admin.gateway.title": "API Gateway",
-	"chat.greeting": "¿En qué puedo ayudarte?"
+	"chat.greeting": "¿En qué puedo ayudarte?",
+
+	"admin.subagents": "Sub-agentes",
+	"admin.subagentsEnabled": "Habilitar sub-agentes",
+	"admin.subagentsHint": "Permite a la IA delegar tareas a sub-agentes. Cada sub-agente crea un chat real con acceso completo a herramientas. Usa llamadas LLM adicionales.",
+	"admin.subagentsMaxConcurrent": "Máx. simultáneos",
+	"admin.subagentsMaxConcurrentHint": "sub-agentes simultáneos",
+	"admin.subagentsMaxIterations": "Máx. iteraciones",
+	"admin.subagentsMaxIterationsHint": "bucles de herramientas por sub-agente",
+	"admin.subagentsMaxOutput": "Máx. salida",
+	"admin.subagentsSystemPrompt": "Prompt del sistema",
+	"admin.subagentsSystemPromptPlaceholder": "Eres un sub-agente...",
+	"admin.subagentsSystemPromptHint": "Dejar vacío para el valor predeterminado."
 }

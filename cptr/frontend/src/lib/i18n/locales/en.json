@@ -692,6 +692,11 @@
 	"admin.subagentsMaxOutput": "Max output",
 	"admin.subagentsSystemPrompt": "System prompt",
 	"admin.subagentsSystemPromptPlaceholder": "You are a sub-agent...",
-	"admin.subagentsSystemPromptHint": "Leave empty for the built-in default."
+	"admin.subagentsSystemPromptHint": "Leave empty for the built-in default.",
+
+	"admin.contextCompaction": "Context compaction",
+	"admin.compactTokenThreshold": "Token threshold",
+	"admin.compactTokenThresholdUnit": "tokens",
+	"admin.compactTokenThresholdHint": "Older messages are summarized when estimated context exceeds this limit. Default: 80,000."
 }
 

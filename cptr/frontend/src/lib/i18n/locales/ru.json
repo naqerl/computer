@@ -569,5 +569,17 @@
 	"admin.gateway.newKey": "Новый API-ключ создан. Скопируйте его сейчас",
 	"admin.gateway.noKeys": "API-ключей пока нет",
 	"admin.gateway.title": "API-шлюз",
-	"chat.greeting": "Чем могу помочь?"
+	"chat.greeting": "Чем могу помочь?",
+
+	"admin.subagents": "Суб-агенты",
+	"admin.subagentsEnabled": "Включить суб-агентов",
+	"admin.subagentsHint": "Позволяет ИИ делегировать задачи суб-агентам. Каждый суб-агент создаёт реальный чат с полным доступом к инструментам. Использует дополнительные вызовы LLM.",
+	"admin.subagentsMaxConcurrent": "Макс. одновременно",
+	"admin.subagentsMaxConcurrentHint": "одновременных суб-агентов",
+	"admin.subagentsMaxIterations": "Макс. итераций",
+	"admin.subagentsMaxIterationsHint": "циклов инструментов на суб-агента",
+	"admin.subagentsMaxOutput": "Макс. вывод",
+	"admin.subagentsSystemPrompt": "Системный промпт",
+	"admin.subagentsSystemPromptPlaceholder": "Вы — суб-агент...",
+	"admin.subagentsSystemPromptHint": "Оставьте пустым для значения по умолчанию."
 }

@@ -569,5 +569,17 @@
 	"admin.gateway.newKey": "Neuer API-Schlüssel erstellt. Jetzt kopieren",
 	"admin.gateway.noKeys": "Noch keine API-Schlüssel",
 	"admin.gateway.title": "API-Gateway",
-	"chat.greeting": "Wie kann ich Ihnen helfen?"
+	"chat.greeting": "Wie kann ich Ihnen helfen?",
+
+	"admin.subagents": "Sub-Agenten",
+	"admin.subagentsEnabled": "Sub-Agenten aktivieren",
+	"admin.subagentsHint": "Ermöglicht der KI, Aufgaben an Sub-Agenten zu delegieren. Jeder Sub-Agent erstellt einen echten Chat mit vollem Werkzeugzugriff. Verwendet zusätzliche LLM-Aufrufe.",
+	"admin.subagentsMaxConcurrent": "Max. gleichzeitig",
+	"admin.subagentsMaxConcurrentHint": "gleichzeitige Sub-Agenten",
+	"admin.subagentsMaxIterations": "Max. Iterationen",
+	"admin.subagentsMaxIterationsHint": "Werkzeugschleifen pro Sub-Agent",
+	"admin.subagentsMaxOutput": "Max. Ausgabe",
+	"admin.subagentsSystemPrompt": "System-Prompt",
+	"admin.subagentsSystemPromptPlaceholder": "Du bist ein Sub-Agent...",
+	"admin.subagentsSystemPromptHint": "Leer lassen für den integrierten Standard."
 }

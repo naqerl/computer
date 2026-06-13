@@ -569,5 +569,17 @@
 	"admin.gateway.newKey": "新 API 金鑰已建立。請立即複製",
 	"admin.gateway.noKeys": "尚無 API 金鑰",
 	"admin.gateway.title": "API 閘道",
-	"chat.greeting": "有什麼可以幫您的？"
+	"chat.greeting": "有什麼可以幫您的？",
+
+	"admin.subagents": "子代理",
+	"admin.subagentsEnabled": "啟用子代理",
+	"admin.subagentsHint": "允許 AI 將任務委派給子代理。每個子代理會建立一個擁有完整工具存取權限的真實聊天。會使用額外的 LLM 呼叫。",
+	"admin.subagentsMaxConcurrent": "最大同時數",
+	"admin.subagentsMaxConcurrentHint": "個同時執行的子代理",
+	"admin.subagentsMaxIterations": "最大迭代次數",
+	"admin.subagentsMaxIterationsHint": "每個子代理的工具迴圈次數",
+	"admin.subagentsMaxOutput": "最大輸出",
+	"admin.subagentsSystemPrompt": "系統提示詞",
+	"admin.subagentsSystemPromptPlaceholder": "你是一個子代理...",
+	"admin.subagentsSystemPromptHint": "留空以使用內建預設值。"
 }

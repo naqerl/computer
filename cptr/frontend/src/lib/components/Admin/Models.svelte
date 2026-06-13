@@ -4,6 +4,8 @@
 	import {
 		getModelConfig,
 		updateModelConfig,
+		getAdminConfig,
+		updateConfig,
 		type ModelConfigEntry
 	} from '$lib/apis/admin';
 	import { t } from '$lib/i18n';
@@ -32,6 +34,10 @@
 	let globalExpanded = $state(false);
 	let showVariables = $state(false);
 
+	// Context compaction
+	let compactTokenThreshold = $state(80000);
+	let compactDirty = $state(false);
+
 	const TEMPLATE_VARIABLES = [
 		{ name: 'WORKSPACE_NAME', desc: 'Workspace folder name' },
 		{ name: 'WORKSPACE_PATH', desc: 'Full workspace path' },
@@ -52,7 +58,7 @@ Workspace: {{WORKSPACE_NAME}}
 Files:
 {{FILE_TREE}}`;
 
-	let hasDirty = $derived(globalDirty || models.some((m) => m.dirty));
+	let hasDirty = $derived(globalDirty || compactDirty || models.some((m) => m.dirty));
 
 	function parseRows(config: ModelConfigEntry | undefined): ParamRow[] {
 		const rp = config?.params?.request_params;
@@ -98,6 +104,12 @@ Files:
 		} finally {
 			loading = false;
 		}
+
+		// Load context compaction threshold from admin config
+		try {
+			const adminCfg = await getAdminConfig();
+			compactTokenThreshold = Number(adminCfg['chat.compact_token_threshold']) || 80000;
+		} catch {}
 	});
 
 	async function toggleModel(e: Event, model: ModelEntry) {
@@ -145,6 +157,13 @@ Files:
 			await Promise.all(promises);
 			globalDirty = false;
 			models.forEach((m) => (m.dirty = false));
+
+			// Save context compaction threshold
+			if (compactDirty) {
+				await updateConfig({ 'chat.compact_token_threshold': compactTokenThreshold });
+				compactDirty = false;
+			}
+
 			toast.success($t('settings.saved'));
 		} catch {
 			toast.error($t('models.failedToSave'));
@@ -256,6 +275,24 @@ Files:
 			<h2 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
 				{$t('admin.models')}
 			</h2>
+
+			<!-- Context compaction -->
+			<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('admin.contextCompaction')}</h3>
+
+			<div class="flex flex-col gap-2.5 mb-5">
+				<div>
+					<label class="text-xs text-gray-600 dark:text-gray-400" for="compact-threshold">{$t('admin.compactTokenThreshold')}</label>
+					<div class="flex items-center gap-1.5 mt-1">
+						<input id="compact-threshold" type="number" bind:value={compactTokenThreshold}
+							oninput={() => (compactDirty = true)}
+							min="10000" max="1000000" step="10000"
+							class="w-24 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors" />
+						<span class="text-[11px] text-gray-400 dark:text-gray-600">{$t('admin.compactTokenThresholdUnit')}</span>
+					</div>
+					<p class="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">{$t('admin.compactTokenThresholdHint')}</p>
+				</div>
+			</div>
+
 			<!-- Global defaults -->
 			<button
 				class="group flex items-center gap-2 w-full h-7 text-left"
