@@ -90,6 +90,13 @@
 	display: none;
 }
 
+.scrollbar-hover::-webkit-scrollbar-thumb {
+	visibility: hidden;
+}
+.scrollbar-hover:hover::-webkit-scrollbar-thumb {
+	visibility: visible;
+}
+
 /* CodeMirror - match Open WebUI */
 .cm-editor {
 	height: 100%;
