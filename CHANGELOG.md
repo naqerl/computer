@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.5] - 2026-06-13
+
+### Added
+
+- 🌳 **Chat branching from Open WebUI.** Regenerating or editing a message in Open WebUI now creates proper branches in the cptr sidebar, just like it does in OWUI. Requires custom headers on the OWUI connection (copy from Gateway settings).
+- 🚦 **Background task filtering.** Open WebUI's automatic title generation, follow-up suggestions, and tag extraction no longer create ghost chats or trigger the agent loop.
+- 📡 **More header templates.** Gateway settings now shows the full recommended header config for Open WebUI connections, including message and task type forwarding. One-click copy. Requires Open WebUI ≥ 0.9.7.
+
+### Fixed
+
+- 🐛 **Chat metadata could be empty on second turn.** Fixed an operator precedence issue in message resolution.
+
 ## [0.3.4] - 2026-06-12
 
 ### Changed
