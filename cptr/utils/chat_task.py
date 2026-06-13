@@ -26,7 +26,7 @@ from cptr.utils.ai import (
 )
 from cptr.utils.config import _get_jwt_secret, now_ms
 from cptr.utils.crypto import decrypt_key
-from cptr.utils.tools import TOOLS, execute_tool, get_tool_list, _fn_to_schema, create_artifact
+from cptr.utils.tools import ALL_TOOLS, execute_tool, get_tool_list, _fn_to_schema, create_artifact
 from cptr.utils.chat_export import export_chat_to_file
 from cptr.utils.json_parser import extract_json
 
@@ -891,7 +891,7 @@ async def run_chat_task(
         # Plan mode: strip write tools, inject prompt as user message (not system, to preserve cache)
         plan_mode = chat_params.get("plan_mode", False)
         if plan_mode:
-            tools = [t for t in tools if TOOLS.get(t["name"], {}).get("auto")]
+            tools = [t for t in tools if ALL_TOOLS.get(t["name"], {}).get("auto")]
             # Inject create_artifact (only available in plan mode)
             tools.append(_fn_to_schema("create_artifact", create_artifact))
             messages.append({"role": "user", "content": PLAN_MODE_PROMPT})
@@ -1037,7 +1037,7 @@ async def run_chat_task(
                     flushed_item = _flush_text()
 
                     name = event["name"]
-                    tool = TOOLS.get(name)
+                    tool = ALL_TOOLS.get(name)
                     item = {
                         "type": "function_call",
                         "id": str(uuid.uuid4()),

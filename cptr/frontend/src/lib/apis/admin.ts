@@ -128,3 +128,41 @@ export const updateModelConfig = (
 		...jsonBody(update),
 		method: 'PUT'
 	});
+
+// ── Tool Servers ────────────────────────────────────────────
+
+export interface ToolServer {
+	id: string;
+	type: 'openapi' | 'mcp';
+	url: string;
+	path: string;
+	auth_type: string;
+	key: string;
+	name: string;
+	description: string;
+	headers: Record<string, string> | null;
+	enabled: boolean;
+}
+
+export const listToolServers = async (): Promise<ToolServer[]> => {
+	const data = await fetchJSON<{ servers: ToolServer[] }>('/api/admin/tools/servers');
+	return data.servers;
+};
+
+export const createToolServer = (server: Omit<ToolServer, 'id'>) =>
+	fetchJSON('/api/admin/tools/servers', jsonBody(server));
+
+export const updateToolServer = (id: string, updates: Partial<Omit<ToolServer, 'id'>>) =>
+	fetchJSON(`/api/admin/tools/servers/${id}`, {
+		...jsonBody(updates),
+		method: 'PUT'
+	});
+
+export const deleteToolServer = (id: string) =>
+	fetchJSON(`/api/admin/tools/servers/${id}`, { method: 'DELETE' });
+
+export const verifyToolServer = (id: string) =>
+	fetchJSON<{ ok: boolean; tools?: { name: string; description: string }[]; message?: string }>(
+		`/api/admin/tools/servers/${id}/verify`,
+		{ method: 'POST' }
+	);

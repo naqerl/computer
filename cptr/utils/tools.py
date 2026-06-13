@@ -1198,7 +1198,7 @@ TOOLS: dict[str, dict] = {
     "delete_automation": {"fn": delete_automation, "auto": False},
 }
 
-# Browser tools — registered conditionally based on browser.enabled config
+# Browser tools — conditionally included in schemas based on browser.enabled
 BROWSER_TOOLS: dict[str, dict] = {
     "browser_navigate": {"fn": browser_navigate, "auto": False},
     "browser_snapshot": {"fn": browser_snapshot, "auto": True},
@@ -1207,6 +1207,157 @@ BROWSER_TOOLS: dict[str, dict] = {
     "browser_screenshot": {"fn": browser_screenshot, "auto": True},
     "browser_evaluate": {"fn": browser_evaluate, "auto": False},
 }
+
+# Combined lookup for execution and approval (always available regardless of config)
+ALL_TOOLS: dict[str, dict] = {**TOOLS, **BROWSER_TOOLS}
+
+
+# ── External tool servers ───────────────────────────────────
+
+_tool_server_cache: dict | None = None  # {"servers": [...], "tools": {name: {server, spec}}}
+
+
+async def _load_tool_servers() -> dict:
+    """Load and cache external tool server config + specs.
+
+    Returns a dict with 'servers' (raw config list) and 'tools' mapping
+    prefixed tool names to {server, spec, type}.
+    """
+    global _tool_server_cache
+    if _tool_server_cache is not None:
+        return _tool_server_cache
+
+    from cptr.models import Config
+
+    servers = await Config.get("tool_servers") or []
+    tools: dict[str, dict] = {}
+
+    for server in servers:
+        if not server.get("enabled", True):
+            continue
+
+        server_id = server.get("id", "")
+        server_type = server.get("type", "openapi")
+
+        try:
+            if server_type == "openapi":
+                from cptr.utils.openapi import fetch_openapi_spec, convert_openapi_to_tool_specs
+
+                url = server.get("url", "").rstrip("/")
+                path = server.get("path", "openapi.json")
+                if path.startswith("http"):
+                    spec_url = path
+                else:
+                    spec_url = f"{url}/{path.lstrip('/')}"
+
+                headers = _build_server_headers(server)
+                openapi_spec = await fetch_openapi_spec(spec_url, headers)
+                server["_openapi_spec"] = openapi_spec
+
+                for spec in convert_openapi_to_tool_specs(openapi_spec):
+                    prefixed = f"{server_id}_{spec['name']}"
+                    tools[prefixed] = {
+                        "server": server,
+                        "spec": {**spec, "name": prefixed},
+                        "original_name": spec["name"],
+                        "type": "openapi",
+                    }
+
+            elif server_type == "mcp":
+                from cptr.utils.mcp.client import MCPClient
+
+                client = MCPClient()
+                headers = _build_server_headers(server)
+                await client.connect(server.get("url", ""), headers)
+
+                for spec in await client.list_tool_specs():
+                    prefixed = f"{server_id}_{spec['name']}"
+                    tools[prefixed] = {
+                        "server": server,
+                        "spec": {**spec, "name": prefixed},
+                        "original_name": spec["name"],
+                        "type": "mcp",
+                    }
+
+                await client.disconnect()
+
+        except Exception:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "Failed to load tool server '%s'", server_id, exc_info=True
+            )
+
+    _tool_server_cache = {"servers": servers, "tools": tools}
+    return _tool_server_cache
+
+
+def invalidate_tool_server_cache() -> None:
+    """Clear the external tool server cache, forcing a reload on next access."""
+    global _tool_server_cache
+    _tool_server_cache = None
+
+
+def _build_server_headers(server: dict) -> dict | None:
+    """Build auth + custom headers for a tool server connection."""
+    headers = dict(server.get("headers") or {})
+    auth_type = server.get("auth_type", "bearer")
+    if auth_type == "bearer":
+        key = server.get("key", "")
+        if key:
+            headers["Authorization"] = f"Bearer {key}"
+    return headers or None
+
+
+async def _execute_external_tool(name: str, args: dict) -> str:
+    """Execute an external tool by its prefixed name ({server_id}_{tool_name})."""
+    cache = await _load_tool_servers()
+    tool_info = cache["tools"].get(name)
+    if not tool_info:
+        return f"Error: external tool '{name}' not found"
+
+    server = tool_info["server"]
+    original_name = tool_info["original_name"]
+    tool_type = tool_info["type"]
+    headers = _build_server_headers(server)
+
+    try:
+        if tool_type == "mcp":
+            from cptr.utils.mcp.client import MCPClient
+
+            client = MCPClient()
+            await client.connect(server.get("url", ""), headers)
+            try:
+                result = await client.call_tool(original_name, args)
+                # MCP returns a list of content items; extract text
+                texts = []
+                for item in result:
+                    if isinstance(item, dict):
+                        if item.get("type") == "text":
+                            texts.append(item.get("text", ""))
+                        else:
+                            texts.append(json.dumps(item))
+                return "\n".join(texts) if texts else "(no output)"
+            finally:
+                await client.disconnect()
+
+        elif tool_type == "openapi":
+            from cptr.utils.openapi import execute_openapi_tool
+
+            openapi_spec = server.get("_openapi_spec", {})
+            return await execute_openapi_tool(
+                server_url=server.get("url", "").rstrip("/"),
+                openapi_spec=openapi_spec,
+                tool_name=original_name,
+                args=args,
+                headers=headers,
+            )
+
+        else:
+            return f"Error: unknown tool server type: {tool_type}"
+
+    except Exception as e:
+        return f"Error executing external tool '{name}': {e}"
 
 
 # ── Schema from function signature ──────────────────────────
@@ -1264,7 +1415,8 @@ def _fn_to_schema(name: str, fn) -> dict:
 async def get_tool_list() -> list[dict]:
     """Return tool schemas for the LLM.
 
-    Automatically includes browser tools when browser.enabled is true in config.
+    Automatically includes browser tools when browser.enabled is true,
+    and external tool server tools when configured.
     """
     tools = dict(TOOLS)
     try:
@@ -1274,21 +1426,38 @@ async def get_tool_list() -> list[dict]:
             tools.update(BROWSER_TOOLS)
     except Exception:
         pass
-    return [_fn_to_schema(name, t["fn"]) for name, t in tools.items()]
+
+    schemas = [_fn_to_schema(name, t["fn"]) for name, t in tools.items()]
+
+    # Add external tool server schemas
+    try:
+        cache = await _load_tool_servers()
+        for tool_info in cache["tools"].values():
+            schemas.append(tool_info["spec"])
+    except Exception:
+        pass
+
+    return schemas
 
 
 async def execute_tool(name: str, args: dict, __context__: dict) -> str:
     """Execute a tool by name, injecting execution context."""
-    info = TOOLS.get(name) or BROWSER_TOOLS.get(name)
-    if not info:
-        return f"Error: unknown tool: {name}"
-    fn = info["fn"]
-    try:
-        sig = inspect.signature(fn)
-        if "__context__" in sig.parameters:
-            return await fn(**args, __context__=__context__)
-        else:
-            # Legacy tools: inject workspace directly
-            return await fn(**args, workspace=__context__["workspace"])
-    except Exception as e:
-        return f"Error executing {name}: {e}"
+    info = ALL_TOOLS.get(name)
+    if info:
+        fn = info["fn"]
+        try:
+            sig = inspect.signature(fn)
+            if "__context__" in sig.parameters:
+                return await fn(**args, __context__=__context__)
+            else:
+                # Legacy tools: inject workspace directly
+                return await fn(**args, workspace=__context__["workspace"])
+        except Exception as e:
+            return f"Error executing {name}: {e}"
+
+    # Check external tool servers
+    cache = await _load_tool_servers()
+    if name in cache["tools"]:
+        return await _execute_external_tool(name, args)
+
+    return f"Error: unknown tool: {name}"

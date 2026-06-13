@@ -178,8 +178,16 @@
 					return _t('chat.tool.fetchUrlFallback');
 				}
 			}
-			default:
+			default: {
+				// External tool: {server_id}_{tool_name} → "tool_name (server_id)"
+				const idx = name.indexOf('_');
+				if (idx > 0) {
+					const serverId = name.slice(0, idx);
+					const toolName = name.slice(idx + 1);
+					return `${toolName} (${serverId})`;
+				}
 				return name;
+			}
 		}
 	}
 

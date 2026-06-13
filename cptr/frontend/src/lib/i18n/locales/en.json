@@ -645,6 +645,41 @@
 
 	"chat.dictate.unsupported": "Speech recognition not supported in this browser.",
 	"chat.fallbackTitle": "Chat",
-	"chat.greeting": "What can I help you with?"
+	"chat.greeting": "What can I help you with?",
+
+	"admin.toolServers": "Tool Servers",
+
+	"toolServers.title": "Tool Servers",
+	"toolServers.empty": "No tool servers configured",
+	"toolServers.add": "Add Server",
+	"toolServers.edit": "Edit Server",
+	"toolServers.id": "ID",
+	"toolServers.name": "Name",
+	"toolServers.type": "Type",
+	"toolServers.namePlaceholder": "My MCP Server",
+	"toolServers.url": "URL",
+	"toolServers.specPath": "Spec path",
+	"toolServers.fieldsRequired": "ID and URL are required",
+	"toolServers.idInvalid": "ID must be lowercase letters, numbers, and underscores only",
+	"toolServers.auth": "Auth",
+	"toolServers.authNone": "None",
+	"toolServers.authBearer": "Bearer",
+	"toolServers.apiKey": "API Key",
+	"toolServers.description": "Description",
+	"toolServers.descriptionPlaceholder": "What does this server do?",
+	"toolServers.headers": "Headers",
+	"toolServers.headersHint": "Additional HTTP headers as JSON.",
+	"toolServers.headersInvalid": "Headers must be a valid JSON object",
+	"toolServers.verify": "Verify",
+	"toolServers.connected": "Connected",
+	"toolServers.toolsFound": "tools found",
+	"toolServers.delete": "Delete",
+	"toolServers.loadError": "Failed to load tool servers",
+	"toolServers.urlRequired": "URL is required",
+	"toolServers.created": "Tool server added",
+	"toolServers.updated": "Tool server updated",
+	"toolServers.deleted": "Tool server deleted",
+	"toolServers.saveFailed": "Failed to save tool server",
+	"toolServers.deleteFailed": "Failed to delete tool server"
 }
 

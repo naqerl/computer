@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 pam = ["python-pam>=2.0"]
+mcp = ["mcp>=1.8"]
 
 [dependency-groups]
 dev = [

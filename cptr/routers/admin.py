@@ -425,3 +425,170 @@ async def update_model_config(
     await Config.upsert({CONFIG_KEY_CHAT_MODELS: all_config})
     return {"ok": True}
 
+
+# ── Tool servers ─────────────────────────────────────────────
+
+CONFIG_KEY_TOOL_SERVERS = "tool_servers"
+
+
+async def _get_tool_servers() -> list[dict]:
+    """Get all tool server configs from config store."""
+    return await Config.get(CONFIG_KEY_TOOL_SERVERS) or []
+
+
+async def _save_tool_servers(servers: list[dict]):
+    """Save tool server configs and invalidate cache."""
+    await Config.upsert({CONFIG_KEY_TOOL_SERVERS: servers})
+    from cptr.utils.tools import invalidate_tool_server_cache
+
+    invalidate_tool_server_cache()
+
+
+def _mask_tool_server(server: dict) -> dict:
+    """Return server with masked API key for display."""
+    masked = {**server}
+    if masked.get("key"):
+        key = masked["key"]
+        masked["key"] = key[:4] + "****" + key[-4:] if len(key) > 8 else "****"
+    return masked
+
+
+@router.get("/tools/servers")
+async def list_tool_servers(request: Request):
+    """List all configured tool servers (keys masked)."""
+    require_admin(request)
+    servers = await _get_tool_servers()
+    return {"servers": [_mask_tool_server(s) for s in servers]}
+
+
+class CreateToolServerRequest(BaseModel):
+    id: str
+    type: str = "openapi"  # "openapi" | "mcp"
+    url: str
+    path: str = "openapi.json"  # OpenAPI spec path (OpenAPI only)
+    auth_type: str = "bearer"  # "bearer" | "none"
+    key: Optional[str] = None
+    name: str = ""
+    description: str = ""
+    headers: Optional[dict] = None
+    enabled: bool = True
+
+
+@router.post("/tools/servers")
+async def create_tool_server(body: CreateToolServerRequest, request: Request):
+    """Add a new external tool server."""
+    require_admin(request)
+    import re as _re
+
+    server_id = body.id.strip()
+    if not server_id or not _re.fullmatch(r"[a-z0-9_]+", server_id):
+        raise HTTPException(400, "ID must be lowercase alphanumeric with underscores only")
+
+    servers = await _get_tool_servers()
+    if any(s["id"] == server_id for s in servers):
+        raise HTTPException(409, f"Server ID '{server_id}' already exists")
+
+    server = {
+        "id": server_id,
+        "type": body.type,
+        "url": body.url,
+        "path": body.path,
+        "auth_type": body.auth_type,
+        "key": body.key or "",
+        "name": body.name or server_id,
+        "description": body.description,
+        "headers": body.headers,
+        "enabled": body.enabled,
+    }
+    servers.append(server)
+    await _save_tool_servers(servers)
+    return {"ok": True, "id": server["id"]}
+
+
+class UpdateToolServerRequest(BaseModel):
+    type: Optional[str] = None
+    url: Optional[str] = None
+    path: Optional[str] = None
+    auth_type: Optional[str] = None
+    key: Optional[str] = None
+    name: Optional[str] = None
+    description: Optional[str] = None
+    headers: Optional[dict] = None
+    enabled: Optional[bool] = None
+
+
+@router.put("/tools/servers/{server_id}")
+async def update_tool_server(server_id: str, body: UpdateToolServerRequest, request: Request):
+    """Update an existing tool server."""
+    require_admin(request)
+    servers = await _get_tool_servers()
+    server = next((s for s in servers if s["id"] == server_id), None)
+    if not server:
+        raise HTTPException(404, "tool server not found")
+
+    for field in ("type", "url", "path", "auth_type", "name", "description"):
+        val = getattr(body, field)
+        if val is not None:
+            server[field] = val
+    if body.key is not None and body.key != "":
+        server["key"] = body.key
+    if body.headers is not None:
+        server["headers"] = body.headers
+    if body.enabled is not None:
+        server["enabled"] = body.enabled
+
+    await _save_tool_servers(servers)
+    return {"ok": True}
+
+
+@router.delete("/tools/servers/{server_id}")
+async def delete_tool_server(server_id: str, request: Request):
+    """Delete a tool server."""
+    require_admin(request)
+    servers = [s for s in await _get_tool_servers() if s["id"] != server_id]
+    await _save_tool_servers(servers)
+    return {"ok": True}
+
+
+@router.post("/tools/servers/{server_id}/verify")
+async def verify_tool_server(server_id: str, request: Request):
+    """Test connectivity to a tool server. Returns discovered tools."""
+    require_admin(request)
+    servers = await _get_tool_servers()
+    server = next((s for s in servers if s["id"] == server_id), None)
+    if not server:
+        raise HTTPException(404, "tool server not found")
+
+    server_type = server.get("type", "openapi")
+    url = server.get("url", "")
+    headers = dict(server.get("headers") or {})
+    if server.get("auth_type") == "bearer" and server.get("key"):
+        headers["Authorization"] = f"Bearer {server['key']}"
+
+    try:
+        if server_type == "mcp":
+            from cptr.utils.mcp.client import MCPClient
+
+            client = MCPClient()
+            await client.connect(url, headers or None)
+            try:
+                specs = await client.list_tool_specs()
+                return {"ok": True, "tools": specs}
+            finally:
+                await client.disconnect()
+
+        else:  # openapi
+            from cptr.utils.openapi import fetch_openapi_spec, convert_openapi_to_tool_specs
+
+            path = server.get("path", "openapi.json")
+            if path.startswith("http"):
+                spec_url = path
+            else:
+                spec_url = f"{url.rstrip('/')}/{path.lstrip('/')}"
+
+            spec = await fetch_openapi_spec(spec_url, headers or None)
+            tools = convert_openapi_to_tool_specs(spec)
+            return {"ok": True, "tools": tools}
+
+    except Exception as e:
+        return JSONResponse({"ok": False, "message": str(e)}, 400)
