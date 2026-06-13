@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "Gateway-Modell konnte nicht gespeichert werden",
 	"admin.gateway.newKey": "Neuer API-Schlüssel erstellt. Jetzt kopieren",
 	"admin.gateway.noKeys": "Noch keine API-Schlüssel",
-	"admin.gateway.title": "API-Gateway"
+	"admin.gateway.title": "API-Gateway",
+	"chat.greeting": "Wie kann ich Ihnen helfen?"
 }

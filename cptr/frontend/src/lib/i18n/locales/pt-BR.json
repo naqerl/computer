@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "Falha ao salvar o modelo gateway",
 	"admin.gateway.newKey": "Nova chave API criada. Copie-a agora",
 	"admin.gateway.noKeys": "Nenhuma chave API ainda",
-	"admin.gateway.title": "API Gateway"
+	"admin.gateway.title": "API Gateway",
+	"chat.greeting": "Como posso ajudar?"
 }

@@ -877,7 +877,7 @@
 				<!-- Greeting -->
 				<div class="mb-8 text-center">
 					<h1 class="text-lg font-normal text-gray-800 dark:text-gray-200 tracking-tight">
-						What can I help you with?
+						{$t('chat.greeting')}
 					</h1>
 				</div>
 

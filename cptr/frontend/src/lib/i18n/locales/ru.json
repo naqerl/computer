@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "Не удалось сохранить модель шлюза",
 	"admin.gateway.newKey": "Новый API-ключ создан. Скопируйте его сейчас",
 	"admin.gateway.noKeys": "API-ключей пока нет",
-	"admin.gateway.title": "API-шлюз"
+	"admin.gateway.title": "API-шлюз",
+	"chat.greeting": "Чем могу помочь?"
 }

@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "儲存閘道模型失敗",
 	"admin.gateway.newKey": "新 API 金鑰已建立。請立即複製",
 	"admin.gateway.noKeys": "尚無 API 金鑰",
-	"admin.gateway.title": "API 閘道"
+	"admin.gateway.title": "API 閘道",
+	"chat.greeting": "有什麼可以幫您的？"
 }

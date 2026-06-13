@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "ゲートウェイモデルの保存に失敗しました",
 	"admin.gateway.newKey": "新しいAPIキーが作成されました。今すぐコピーしてください",
 	"admin.gateway.noKeys": "APIキーがまだありません",
-	"admin.gateway.title": "APIゲートウェイ"
+	"admin.gateway.title": "APIゲートウェイ",
+	"chat.greeting": "何かお手伝いできますか？"
 }

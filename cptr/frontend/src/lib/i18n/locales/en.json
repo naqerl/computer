@@ -644,6 +644,7 @@
 	"chat.edit.item": "Item",
 
 	"chat.dictate.unsupported": "Speech recognition not supported in this browser.",
-	"chat.fallbackTitle": "Chat"
+	"chat.fallbackTitle": "Chat",
+	"chat.greeting": "What can I help you with?"
 }
 

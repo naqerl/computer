@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "保存网关模型失败",
 	"admin.gateway.newKey": "新 API 密钥已创建。请立即复制",
 	"admin.gateway.noKeys": "暂无 API 密钥",
-	"admin.gateway.title": "API 网关"
+	"admin.gateway.title": "API 网关",
+	"chat.greeting": "有什么可以帮您的？"
 }

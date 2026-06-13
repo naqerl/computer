@@ -568,5 +568,6 @@
 	"admin.gateway.modelSaveError": "게이트웨이 모델 저장에 실패했습니다",
 	"admin.gateway.newKey": "새 API 키가 생성되었습니다. 지금 복사하세요",
 	"admin.gateway.noKeys": "API 키가 아직 없습니다",
-	"admin.gateway.title": "API 게이트웨이"
+	"admin.gateway.title": "API 게이트웨이",
+	"chat.greeting": "무엇을 도와드릴까요?"
 }

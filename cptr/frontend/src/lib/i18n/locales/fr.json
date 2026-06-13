@@ -567,5 +567,6 @@
 	"admin.gateway.modelSaveError": "Échec de l'enregistrement du modèle passerelle",
 	"admin.gateway.newKey": "Nouvelle clé API créée. Copiez-la maintenant",
 	"admin.gateway.noKeys": "Aucune clé API",
-	"admin.gateway.title": "Passerelle API"
+	"admin.gateway.title": "Passerelle API",
+	"chat.greeting": "Comment puis-je vous aider ?"
 }
