@@ -80,6 +80,13 @@ async def shutdown():
         await shutdown_browser()
     except Exception:
         pass
+    # Clean up stdio MCP server processes
+    try:
+        from cptr.utils.mcp.stdio_manager import stdio_manager
+
+        await stdio_manager.disconnect_all()
+    except Exception:
+        pass
 
 
 # Auth middleware

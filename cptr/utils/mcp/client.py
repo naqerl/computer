@@ -21,6 +21,7 @@ from contextlib import AsyncExitStack
 import anyio
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
+from mcp.client.stdio import stdio_client, StdioServerParameters
 from mcp.types import CallToolResult
 
 logger = logging.getLogger(__name__)
@@ -29,14 +30,14 @@ _INIT_TIMEOUT = 30  # seconds
 
 
 class MCPClient:
-    """Manages a single MCP server connection over Streamable HTTP."""
+    """Manages a single MCP server connection over Streamable HTTP or stdio."""
 
     def __init__(self):
         self.session: ClientSession | None = None
         self._exit_stack: AsyncExitStack | None = None
 
     async def connect(self, url: str, headers: dict | None = None) -> None:
-        """Connect to an MCP server.
+        """Connect to an MCP server over Streamable HTTP.
 
         Args:
             url: The server's Streamable HTTP endpoint URL.
@@ -60,6 +61,47 @@ class MCPClient:
                 # tearing everything down when we leave this block.
                 self._exit_stack = exit_stack.pop_all()
                 logger.info("[mcp] Connected to %s", url)
+            except Exception:
+                await asyncio.shield(self.disconnect())
+                raise
+
+    async def connect_stdio(
+        self,
+        command: str,
+        args: list[str] | None = None,
+        env: dict[str, str] | None = None,
+        cwd: str | None = None,
+    ) -> None:
+        """Connect to an MCP server by spawning a local process.
+
+        Args:
+            command: The executable to run (e.g. 'npx', 'python3').
+            args: Command line arguments to pass.
+            env: Optional environment variables for the process.
+            cwd: Optional working directory.
+        """
+        params = StdioServerParameters(
+            command=command,
+            args=args or [],
+            env=env,
+            cwd=cwd,
+        )
+        async with AsyncExitStack() as exit_stack:
+            try:
+                transport = await exit_stack.enter_async_context(
+                    stdio_client(params)
+                )
+                read, write = transport
+
+                self.session = await exit_stack.enter_async_context(
+                    ClientSession(read_stream=read, write_stream=write)
+                )
+
+                with anyio.fail_after(_INIT_TIMEOUT):
+                    await self.session.initialize()
+
+                self._exit_stack = exit_stack.pop_all()
+                logger.info("[mcp] Connected to stdio process: %s %s", command, " ".join(args or []))
             except Exception:
                 await asyncio.shield(self.disconnect())
                 raise

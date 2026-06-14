@@ -463,8 +463,8 @@ async def list_tool_servers(request: Request):
 
 class CreateToolServerRequest(BaseModel):
     id: str
-    type: str = "openapi"  # "openapi" | "mcp"
-    url: str
+    type: str = "openapi"  # "openapi" | "mcp" | "mcp_stdio"
+    url: str = ""  # for openapi/mcp
     path: str = "openapi.json"  # OpenAPI spec path (OpenAPI only)
     auth_type: str = "bearer"  # "bearer" | "none"
     key: Optional[str] = None
@@ -472,6 +472,11 @@ class CreateToolServerRequest(BaseModel):
     description: str = ""
     headers: Optional[dict] = None
     enabled: bool = True
+    # Stdio MCP fields
+    command: str = ""  # for mcp_stdio
+    args: list[str] = []  # for mcp_stdio
+    env: Optional[dict[str, str]] = None  # for mcp_stdio
+    cwd: Optional[str] = None  # for mcp_stdio
 
 
 @router.post("/tools/servers")
@@ -499,6 +504,10 @@ async def create_tool_server(body: CreateToolServerRequest, request: Request):
         "description": body.description,
         "headers": body.headers,
         "enabled": body.enabled,
+        "command": body.command,
+        "args": body.args,
+        "env": body.env,
+        "cwd": body.cwd,
     }
     servers.append(server)
     await _save_tool_servers(servers)
@@ -515,6 +524,11 @@ class UpdateToolServerRequest(BaseModel):
     description: Optional[str] = None
     headers: Optional[dict] = None
     enabled: Optional[bool] = None
+    # Stdio MCP fields
+    command: Optional[str] = None
+    args: Optional[list[str]] = None
+    env: Optional[dict[str, str]] = None
+    cwd: Optional[str] = None
 
 
 @router.put("/tools/servers/{server_id}")
@@ -526,7 +540,7 @@ async def update_tool_server(server_id: str, body: UpdateToolServerRequest, requ
     if not server:
         raise HTTPException(404, "tool server not found")
 
-    for field in ("type", "url", "path", "auth_type", "name", "description"):
+    for field in ("type", "url", "path", "auth_type", "name", "description", "command", "cwd"):
         val = getattr(body, field)
         if val is not None:
             server[field] = val
@@ -536,6 +550,10 @@ async def update_tool_server(server_id: str, body: UpdateToolServerRequest, requ
         server["headers"] = body.headers
     if body.enabled is not None:
         server["enabled"] = body.enabled
+    if body.args is not None:
+        server["args"] = body.args
+    if body.env is not None:
+        server["env"] = body.env
 
     await _save_tool_servers(servers)
     return {"ok": True}
@@ -571,6 +589,22 @@ async def verify_tool_server(server_id: str, request: Request):
 
             client = MCPClient()
             await client.connect(url, headers or None)
+            try:
+                specs = await client.list_tool_specs()
+                return {"ok": True, "tools": specs}
+            finally:
+                await client.disconnect()
+
+        elif server_type == "mcp_stdio":
+            from cptr.utils.mcp.client import MCPClient
+
+            client = MCPClient()
+            await client.connect_stdio(
+                server.get("command", ""),
+                server.get("args", []),
+                server.get("env"),
+                server.get("cwd"),
+            )
             try:
                 specs = await client.list_tool_specs()
                 return {"ok": True, "tools": specs}

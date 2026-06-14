@@ -1422,6 +1422,30 @@ async def _load_tool_servers() -> dict:
 
                 await client.disconnect()
 
+            elif server_type == "mcp_stdio":
+                from cptr.utils.mcp.stdio_manager import stdio_manager
+
+                command = server.get("command", "")
+                args = server.get("args", [])
+                env = server.get("env")
+                cwd = server.get("cwd")
+
+                if not command:
+                    continue
+
+                client = await stdio_manager.get_client(
+                    server_id, command, args, env, cwd
+                )
+                for spec in await client.list_tool_specs():
+                    prefixed = f"{server_id}_{spec['name']}"
+                    tools[prefixed] = {
+                        "server": server,
+                        "spec": {**spec, "name": prefixed},
+                        "original_name": spec["name"],
+                        "type": "mcp_stdio",
+                    }
+                # Don't disconnect — keep process alive
+
         except Exception:
             import logging
 
@@ -1434,9 +1458,25 @@ async def _load_tool_servers() -> dict:
 
 
 def invalidate_tool_server_cache() -> None:
-    """Clear the external tool server cache, forcing a reload on next access."""
+    """Clear the external tool server cache, forcing a reload on next access.
+
+    Also disconnects all stdio MCP processes so they can be re-spawned
+    with potentially updated configuration.
+    """
     global _tool_server_cache
     _tool_server_cache = None
+    # Disconnect stdio servers that may have been reconfigured/removed
+    try:
+        from cptr.utils.mcp.stdio_manager import stdio_manager
+        import asyncio
+
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            asyncio.ensure_future(stdio_manager.disconnect_all())
+        else:
+            loop.run_until_complete(stdio_manager.disconnect_all())
+    except Exception:
+        pass
 
 
 def _build_server_headers(server: dict) -> dict | None:
@@ -1448,6 +1488,18 @@ def _build_server_headers(server: dict) -> dict | None:
         if key:
             headers["Authorization"] = f"Bearer {key}"
     return headers or None
+
+
+def _extract_mcp_result(result: list) -> str:
+    """Extract text from MCP tool result content items."""
+    texts = []
+    for item in result:
+        if isinstance(item, dict):
+            if item.get("type") == "text":
+                texts.append(item.get("text", ""))
+            else:
+                texts.append(json.dumps(item))
+    return "\n".join(texts) if texts else "(no output)"
 
 
 async def _execute_external_tool(name: str, args: dict) -> str:
@@ -1470,17 +1522,22 @@ async def _execute_external_tool(name: str, args: dict) -> str:
             await client.connect(server.get("url", ""), headers)
             try:
                 result = await client.call_tool(original_name, args)
-                # MCP returns a list of content items; extract text
-                texts = []
-                for item in result:
-                    if isinstance(item, dict):
-                        if item.get("type") == "text":
-                            texts.append(item.get("text", ""))
-                        else:
-                            texts.append(json.dumps(item))
-                return "\n".join(texts) if texts else "(no output)"
+                return _extract_mcp_result(result)
             finally:
                 await client.disconnect()
+
+        elif tool_type == "mcp_stdio":
+            from cptr.utils.mcp.stdio_manager import stdio_manager
+
+            client = await stdio_manager.get_client(
+                server.get("id", ""),
+                server.get("command", ""),
+                server.get("args", []),
+                server.get("env"),
+                server.get("cwd"),
+            )
+            result = await client.call_tool(original_name, args)
+            return _extract_mcp_result(result)
 
         elif tool_type == "openapi":
             from cptr.utils.openapi import execute_openapi_tool

@@ -23,7 +23,7 @@
 
 	// Form state
 	let formId = $state('');
-	let formType = $state<'openapi' | 'mcp'>('openapi');
+	let formType = $state<'openapi' | 'mcp' | 'mcp_stdio'>('openapi');
 	let formUrl = $state('');
 	let formPath = $state('openapi.json');
 	let formAuthType = $state('bearer');
@@ -31,6 +31,10 @@
 	let formName = $state('');
 	let formDescription = $state('');
 	let formHeaders = $state('');
+	// Stdio fields
+	let formCommand = $state('');
+	let formArgs = $state('');
+	let formCwd = $state('');
 
 	let saving = $state(false);
 	let verifying = $state(false);
@@ -59,6 +63,9 @@
 		formName = '';
 		formDescription = '';
 		formHeaders = '';
+		formCommand = '';
+		formArgs = '';
+		formCwd = '';
 
 		verifyResult = null;
 		showModal = true;
@@ -75,13 +82,25 @@
 		formName = s.name;
 		formDescription = s.description;
 		formHeaders = s.headers ? JSON.stringify(s.headers, null, 2) : '';
+		formCommand = s.command || '';
+		formArgs = (s.args || []).join(' ');
+		formCwd = s.cwd || '';
 
 		verifyResult = null;
 		showModal = true;
 	}
 
 	async function handleSubmit() {
-		if (!formId.trim() || !formUrl.trim()) {
+		const isStdio = formType === 'mcp_stdio';
+		if (!formId.trim()) {
+			toast.error($t('toolServers.fieldsRequired'));
+			return;
+		}
+		if (isStdio && !formCommand.trim()) {
+			toast.error($t('toolServers.commandRequired'));
+			return;
+		}
+		if (!isStdio && !formUrl.trim()) {
 			toast.error($t('toolServers.fieldsRequired'));
 			return;
 		}
@@ -110,6 +129,7 @@
 				name:
 					formName.trim() ||
 					(() => {
+						if (formType === 'mcp_stdio') return formCommand.trim().split('/').pop() || 'stdio';
 						try {
 							return new URL(formUrl.trim()).hostname;
 						} catch {
@@ -117,7 +137,10 @@
 						}
 					})(),
 				description: formDescription.trim(),
-				headers: parsedHeaders || null
+				headers: parsedHeaders || null,
+				command: formCommand.trim(),
+				args: formArgs.trim() ? formArgs.trim().split(/\s+/) : [],
+				cwd: formCwd.trim() || null
 			};
 			if (editServer) {
 				if (formKey.trim()) data.key = formKey.trim();
@@ -205,17 +228,17 @@
 			>
 				<span
 					class="text-[10px] font-mono shrink-0
-					{s.type === 'mcp'
+					{s.type === 'mcp' || s.type === 'mcp_stdio'
 						? 'text-purple-500 dark:text-purple-400'
 						: 'text-blue-500 dark:text-blue-400'}"
 				>
-					{s.type === 'mcp' ? 'MCP' : 'API'}
+					{s.type === 'mcp' ? 'MCP' : s.type === 'mcp_stdio' ? 'STDIO' : 'API'}
 				</span>
 				<span
 					class="flex-1 text-[13px] truncate
 					{s.enabled ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-600'}"
 				>
-					{s.name || s.url}
+					{s.name || s.command || s.url}
 				</span>
 				<!-- svelte-ignore a11y_no_static_element_interactions -->
 				<span
@@ -288,6 +311,7 @@
 					>
 						<option value="openapi">{$t('toolServers.typeOpenAPI')}</option>
 						<option value="mcp">{$t('toolServers.typeMCP')}</option>
+						<option value="mcp_stdio">{$t('toolServers.typeStdio')}</option>
 					</select>
 				</div>
 			</div>
@@ -305,20 +329,59 @@
 				class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5"
 			/>
 
-			<!-- URL -->
-			<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
-				>{$t('toolServers.url')}</label
-			>
-			<input
-				type="text"
-				placeholder={formType === 'mcp'
-					? 'https://mcp.example.com/mcp'
-					: 'https://api.example.com'}
-				bind:value={formUrl}
-				autocomplete="off"
-				spellcheck="false"
-				class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
-			/>
+			<!-- URL (openapi/mcp only) -->
+			{#if formType !== 'mcp_stdio'}
+				<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
+					>{$t('toolServers.url')}</label
+				>
+				<input
+					type="text"
+					placeholder={formType === 'mcp'
+						? 'https://mcp.example.com/mcp'
+						: 'https://api.example.com'}
+					bind:value={formUrl}
+					autocomplete="off"
+					spellcheck="false"
+					class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
+				/>
+			{/if}
+
+			<!-- Command + Args (mcp_stdio only) -->
+			{#if formType === 'mcp_stdio'}
+				<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
+					>{$t('toolServers.command')}</label
+				>
+				<input
+					type="text"
+					placeholder="npx"
+					bind:value={formCommand}
+					autocomplete="off"
+					spellcheck="false"
+					class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
+				/>
+				<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
+					>{$t('toolServers.args')}</label
+				>
+				<input
+					type="text"
+					placeholder="-y @modelcontextprotocol/server-filesystem /tmp"
+					bind:value={formArgs}
+					autocomplete="off"
+					spellcheck="false"
+					class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
+				/>
+				<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
+					>{$t('toolServers.cwd')}</label
+				>
+				<input
+					type="text"
+					placeholder={$t('toolServers.cwdPlaceholder')}
+					bind:value={formCwd}
+					autocomplete="off"
+					spellcheck="false"
+					class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
+				/>
+			{/if}
 
 			<!-- Spec path (OpenAPI only) -->
 			{#if formType === 'openapi'}
@@ -335,35 +398,37 @@
 				/>
 			{/if}
 
-			<!-- Auth -->
-			<div class="flex gap-3 mt-2">
-				<div class="w-28 shrink-0">
-					<label class="text-[10px] text-gray-400 dark:text-gray-600"
-						>{$t('toolServers.auth')}</label
-					>
-					<select
-						bind:value={formAuthType}
-						class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 outline-none py-0.5 cursor-pointer"
-					>
-						<option value="none">{$t('toolServers.authNone')}</option>
-						<option value="bearer">{$t('toolServers.authBearer')}</option>
-					</select>
-				</div>
-				{#if formAuthType === 'bearer'}
-					<div class="flex-1">
+			<!-- Auth (not for stdio) -->
+			{#if formType !== 'mcp_stdio'}
+				<div class="flex gap-3 mt-2">
+					<div class="w-28 shrink-0">
 						<label class="text-[10px] text-gray-400 dark:text-gray-600"
-							>{$t('toolServers.apiKey')}</label
+							>{$t('toolServers.auth')}</label
 						>
-						<input
-							type="password"
-							placeholder={editServer ? $t('toolServers.apiKeyKeep') : 'sk-...'}
-							bind:value={formKey}
-							autocomplete="new-password"
-							class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
-						/>
+						<select
+							bind:value={formAuthType}
+							class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 outline-none py-0.5 cursor-pointer"
+						>
+							<option value="none">{$t('toolServers.authNone')}</option>
+							<option value="bearer">{$t('toolServers.authBearer')}</option>
+						</select>
 					</div>
-				{/if}
-			</div>
+					{#if formAuthType === 'bearer'}
+						<div class="flex-1">
+							<label class="text-[10px] text-gray-400 dark:text-gray-600"
+								>{$t('toolServers.apiKey')}</label
+							>
+							<input
+								type="password"
+								placeholder={editServer ? $t('toolServers.apiKeyKeep') : 'sk-...'}
+								bind:value={formKey}
+								autocomplete="new-password"
+								class="block w-full bg-transparent text-[13px] text-gray-700 dark:text-gray-300 placeholder:text-gray-300 dark:placeholder:text-gray-700 outline-none py-0.5 font-mono"
+							/>
+						</div>
+					{/if}
+				</div>
+			{/if}
 
 			<!-- Description -->
 			<label class="text-[10px] text-gray-400 dark:text-gray-600 mt-2"
@@ -426,7 +491,7 @@
 					{/if}
 				</div>
 				<button
-					disabled={saving || !formUrl.trim()}
+					disabled={saving || (formType === 'mcp_stdio' ? !formCommand.trim() : !formUrl.trim())}
 					onclick={handleSubmit}
 					class="text-[13px] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-100 disabled:opacity-30 disabled:pointer-events-none"
 				>

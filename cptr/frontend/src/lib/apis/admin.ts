@@ -133,7 +133,7 @@ export const updateModelConfig = (
 
 export interface ToolServer {
 	id: string;
-	type: 'openapi' | 'mcp';
+	type: 'openapi' | 'mcp' | 'mcp_stdio';
 	url: string;
 	path: string;
 	auth_type: string;
@@ -142,6 +142,11 @@ export interface ToolServer {
 	description: string;
 	headers: Record<string, string> | null;
 	enabled: boolean;
+	// Stdio MCP fields
+	command?: string;
+	args?: string[];
+	env?: Record<string, string> | null;
+	cwd?: string | null;
 }
 
 export const listToolServers = async (): Promise<ToolServer[]> => {
