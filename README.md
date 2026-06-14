@@ -14,6 +14,26 @@ Close the tab. Come back tomorrow on any device. Everything is where you left it
 
 Life is short. Touch grass.
 
+## Install
+
+```bash
+pip install cptr
+```
+
+Or with [uv](https://docs.astral.sh/uv/): `uvx cptr@latest run`
+
+## Run
+
+```bash
+cptr run
+```
+
+Opens in your browser. From other devices:
+
+```bash
+cptr run --host 0.0.0.0
+```
+
 ## What you get
 
 | | |
@@ -83,25 +103,7 @@ cptr exposes an OpenAI-compatible API (`/v1/chat/completions`). Any client that 
 
 Read our [Manifesto](MANIFESTO.md).
 
-## Install
 
-```bash
-pip install cptr
-```
-
-Or with [uv](https://docs.astral.sh/uv/): `uvx cptr@latest run`
-
-## Run
-
-```bash
-cptr run
-```
-
-Opens in your browser. From other devices:
-
-```bash
-cptr run --host 0.0.0.0
-```
 
 ## Docker
 
