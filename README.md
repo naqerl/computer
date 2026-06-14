@@ -18,15 +18,10 @@ Life is short. Touch grass.
 
 ```bash
 pip install cptr
+cptr run
 ```
 
 Or with [uv](https://docs.astral.sh/uv/): `uvx cptr@latest run`
-
-## Run
-
-```bash
-cptr run
-```
 
 Opens in your browser. From other devices:
 
