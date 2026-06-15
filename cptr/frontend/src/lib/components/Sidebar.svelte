@@ -12,7 +12,6 @@
 		showChangelog,
 		showSearch,
 	} from '$lib/stores';
-	import { get } from 'svelte/store';
 	import Sortable from 'sortablejs';
 	import Icon from './Icon.svelte';
 	import KeyPill from './KeyPill.svelte';
