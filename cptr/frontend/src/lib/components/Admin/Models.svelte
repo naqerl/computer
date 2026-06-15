@@ -11,6 +11,7 @@
 	import { t } from '$lib/i18n';
 	import Icon from '../Icon.svelte';
 	import Spinner from '$lib/components/common/Spinner.svelte';
+	import ModelSelector from '$lib/components/common/ModelSelector.svelte';
 
 	type ParamRow = { key: string; value: string };
 	type ModelEntry = {
@@ -33,6 +34,9 @@
 	let globalDirty = $state(false);
 	let globalExpanded = $state(false);
 	let showVariables = $state(false);
+
+	// Default model
+	let defaultModelId = $state('');
 
 	// Context compaction
 	let compactTokenThreshold = $state(80000);
@@ -105,10 +109,11 @@ Files:
 			loading = false;
 		}
 
-		// Load context compaction threshold from admin config
+		// Load admin config (default model, context compaction)
 		try {
 			const adminCfg = await getAdminConfig();
 			compactTokenThreshold = Number(adminCfg['chat.compact_token_threshold']) || 80000;
+			defaultModelId = typeof adminCfg['chat.default_model'] === 'string' ? adminCfg['chat.default_model'] : '';
 		} catch {}
 	});
 
@@ -158,11 +163,12 @@ Files:
 			globalDirty = false;
 			models.forEach((m) => (m.dirty = false));
 
-			// Save context compaction threshold
-			if (compactDirty) {
-				await updateConfig({ 'chat.compact_token_threshold': compactTokenThreshold });
-				compactDirty = false;
-			}
+			// Save default model
+			await updateConfig({
+				'chat.compact_token_threshold': compactTokenThreshold,
+				'chat.default_model': defaultModelId
+			});
+			compactDirty = false;
 
 			toast.success($t('settings.saved'));
 		} catch {
@@ -275,6 +281,17 @@ Files:
 			<h2 class="text-sm font-medium text-gray-900 dark:text-white mb-4">
 				{$t('admin.models')}
 			</h2>
+
+			<!-- Default model -->
+			<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2">
+				{$t('models.defaultModel')}
+			</h3>
+			<div class="mb-1">
+				<ModelSelector bind:selectedModel={defaultModelId} preferAbove={false} align="start" />
+			</div>
+			<p class="text-[11px] text-gray-400 dark:text-gray-600 mb-5">
+				{$t('models.defaultModelHint')}
+			</p>
 
 			<!-- Context compaction -->
 			<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('admin.contextCompaction')}</h3>

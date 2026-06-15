@@ -6,8 +6,10 @@
 
 	interface Props {
 		selectedModel: string;
+		preferAbove?: boolean;
+		align?: 'start' | 'end';
 	}
-	let { selectedModel = $bindable() }: Props = $props();
+	let { selectedModel = $bindable(), preferAbove = true, align = 'end' }: Props = $props();
 
 	let btnEl: HTMLButtonElement | undefined = $state();
 	let searchInputEl: HTMLInputElement | undefined = $state();
@@ -76,10 +78,10 @@
 		items={menuItems}
 		anchor={btnEl}
 		onclose={() => (open = false)}
-		preferAbove={true}
+		preferAbove={preferAbove}
 		maxHeight="15rem"
 		className="w-48"
-		align="end"
+		align={align}
 	>
 		{#snippet header()}
 			<div class="flex items-center gap-1.5 h-6 px-2 mt-0.5">

@@ -588,7 +588,8 @@ async def _resolve_model(workspace: str) -> tuple[dict, str, str]:
     Priority:
       1. Gateway model selected in Settings > Gateway
       2. Workspace-specific model override (.cptr/model)
-      3. First enabled connection's first model (with auto-discovery)
+      3. Default model from Settings > Models (chat.default_model)
+      4. First enabled connection's first model (with auto-discovery)
 
     Returns (connection_dict, bare_model, full_model_id).
     """
@@ -619,6 +620,18 @@ async def _resolve_model(workspace: str) -> tuple[dict, str, str]:
             logger.warning(
                 "[openai-compat] Workspace model override '%s' not found, falling back",
                 model_override,
+            )
+
+    # Try the default model (set in Settings > Models)
+    default_model = await Config.get("chat.default_model")
+    if isinstance(default_model, str) and default_model.strip():
+        try:
+            connection, bare = await _resolve_connection(default_model.strip())
+            return connection, bare, default_model.strip()
+        except Exception:
+            logger.warning(
+                "[openai-compat] Default model '%s' not found, falling back",
+                default_model,
             )
 
     # Fall back to the first enabled connection + its first model

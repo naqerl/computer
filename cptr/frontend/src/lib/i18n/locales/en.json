@@ -307,6 +307,9 @@
 	"admin.browserFirecrawlBaseUrlHint": "Change for self-hosted Firecrawl instances",
 
 	"admin.models": "Models",
+	"models.defaultModel": "Default model",
+	"models.defaultModelNone": "None (use first available)",
+	"models.defaultModelHint": "Pre-selected model for new chats and gateway requests.",
 	"models.defaults": "Defaults",
 	"models.noDefaults": "No global defaults",
 	"models.noParams": "No parameters",
