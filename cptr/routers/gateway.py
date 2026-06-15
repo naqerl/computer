@@ -588,7 +588,7 @@ async def _resolve_model(workspace: str) -> tuple[dict, str, str]:
     Priority:
       1. Gateway model selected in Settings > Gateway
       2. Workspace-specific model override (.cptr/model)
-      3. First enabled connection's first model
+      3. First enabled connection's first model (with auto-discovery)
 
     Returns (connection_dict, bare_model, full_model_id).
     """
@@ -622,11 +622,16 @@ async def _resolve_model(workspace: str) -> tuple[dict, str, str]:
             )
 
     # Fall back to the first enabled connection + its first model
+    from cptr.routers.chat import _fetch_provider_models
+
     connections = await Config.get("chat.connections") or []
     for conn in connections:
         if not conn.get("enabled", True):
             continue
         model_ids = conn.get("data", {}).get("models")
+        if not model_ids:
+            # Attempt auto-discovery if models aren't pre-stored
+            model_ids = await _fetch_provider_models(conn)
         if model_ids:
             prefix = (conn.get("prefix_id") or "").strip()
             bare = model_ids[0]
