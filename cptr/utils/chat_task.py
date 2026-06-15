@@ -945,7 +945,12 @@ async def run_chat_task(
 
     async def emit(**data):
         """Stream an output delta to the user."""
-        await emit_to_user(user_id, {"chat_id": chat_id, "message_id": message_id, **data})
+        try:
+            await emit_to_user(user_id, {"chat_id": chat_id, "message_id": message_id, **data})
+        except Exception:
+            # Socket failure must not prevent the queue push below,
+            # otherwise the gateway SSE stream hangs forever.
+            logger.debug("[task %s] emit_to_user failed", message_id[:8], exc_info=True)
         # Push to gateway queue if present
         if output_queue is not None:
             if "delta" in data:
@@ -1491,6 +1496,16 @@ async def run_chat_task(
         _task_state.pop(message_id, None)
         await emit(done=True, error=error_msg)
     finally:
+        # Guarantee the gateway SSE stream terminates.  If emit()
+        # already pushed a done/error event the sentinel is harmless
+        # (_stream checks for None separately).  Without this, a
+        # crash in emit_to_user or an unexpected exit path leaves
+        # the SSE generator hanging for up to 5 minutes.
+        if output_queue is not None:
+            try:
+                await output_queue.put(None)
+            except Exception:
+                pass
         _tasks.pop(message_id, None)
         _task_state.pop(message_id, None)
         _task_chat.pop(message_id, None)

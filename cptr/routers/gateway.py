@@ -527,7 +527,7 @@ async def _proxy_to_llm(
             max_tokens=200,
         )
     except Exception as e:
-        logger.warning("[gateway] Utility task LLM call failed: %s", e)
+        logger.warning("[gateway] Utility task LLM call failed: %r", e)
         result = ""
 
     completion_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
