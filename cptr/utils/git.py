@@ -117,9 +117,16 @@ async def status(root: str) -> dict[str, Any]:
     if upstream and not has_ab:
         upstream = ""
 
+    # Get remote URL for "View on GitHub/GitLab" link
+    code, remote_out, _ = await _run(
+        "remote", "get-url", "origin", cwd=root, check=False
+    )
+    remote_url = remote_out.strip() if code == 0 else ""
+
     return {
         "branch": branch,
         "upstream": upstream,
+        "remote_url": remote_url,
         "ahead": ahead,
         "behind": behind,
         "files": files,

@@ -20,6 +20,7 @@ export interface GitStatus {
 	is_repo: boolean;
 	branch: string;
 	upstream?: string;
+	remote_url?: string;
 	ahead: number;
 	behind: number;
 	files: GitFile[];

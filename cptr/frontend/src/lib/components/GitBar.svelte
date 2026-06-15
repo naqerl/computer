@@ -55,11 +55,11 @@
 	const allStaged = $derived(totalChanges > 0 && unstagedFiles.length === 0);
 	const someStaged = $derived(stagedFiles.length > 0 && unstagedFiles.length > 0);
 
-	// Read from centralized store instead of independent polling
 	let gitStatus = $derived(gitStatusStore.status as {
 		is_repo: boolean;
 		branch: string;
 		upstream: string;
+		remote_url: string;
 		ahead: number;
 		behind: number;
 		files: GitFile[];
@@ -68,6 +68,25 @@
 	// Branch has never been pushed to remote
 	const needsPublish = $derived(!gitStatus?.upstream);
 	const unpushedCount = $derived(needsPublish ? (commits?.length ?? 0) : (gitStatus?.ahead ?? 0));
+
+	// Convert git remote URL to browser URL
+	const remoteWebUrl = $derived.by(() => {
+		const url = gitStatus?.remote_url;
+		if (!url) return '';
+		// SSH: git@github.com:user/repo.git
+		const sshMatch = url.match(/^git@([^:]+):(.+?)(\.git)?$/);
+		if (sshMatch) return `https://${sshMatch[1]}/${sshMatch[2]}`;
+		// HTTPS: https://github.com/user/repo.git
+		return url.replace(/\.git$/, '');
+	});
+
+	const remotePlatform = $derived.by(() => {
+		if (!remoteWebUrl) return '';
+		if (remoteWebUrl.includes('github.com')) return 'GitHub';
+		if (remoteWebUrl.includes('gitlab.com') || remoteWebUrl.includes('gitlab')) return 'GitLab';
+		if (remoteWebUrl.includes('bitbucket')) return 'Bitbucket';
+		try { return new URL(remoteWebUrl).hostname; } catch { return 'Remote'; }
+	});
 
 	// Clear stale selection when file is no longer in the changed list
 	$effect(() => {
@@ -605,6 +624,19 @@
 
 					<div class="flex-1"></div>
 
+					<!-- View on remote -->
+					{#if remoteWebUrl}
+						<a
+							href={remoteWebUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
+							use:tooltip={'View on ' + remotePlatform}
+						>
+							<Icon name="external-link" size={12} />
+						</a>
+					{/if}
+
 					<!-- Maximize toggle -->
 					<button
 						class="flex items-center justify-center w-6 h-6 rounded-md text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/6 transition-colors duration-75"
@@ -875,7 +907,7 @@
 										>{$t('git.selectFile')}</span
 									>
 								{:else}
-									<span class="text-[11px] text-gray-400 dark:text-gray-600"
+									<span class="text-[11px] text-gray-400 dark:text-gray-600 font-sans"
 										>{$t('git.noLocalChanges')}</span
 									>
 								{/if}
