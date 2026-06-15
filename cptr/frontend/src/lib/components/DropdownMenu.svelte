@@ -57,7 +57,7 @@
 	}: Props = $props();
 
 	let menuEl: HTMLDivElement | undefined = $state();
-	let pos = $state<{ x: number; top: number }>({ x: -9999, top: -9999 });
+	let pos = $state<{ x: number; top?: number; bottom?: number }>({ x: -9999, top: -9999 });
 	let anchorWidth = $state(0);
 	let menuMaxHeight = $state<number | undefined>();
 	let ready = $state(false);
@@ -177,6 +177,7 @@
 		const viewport = visualViewportRect();
 		const viewportRight = viewport.left + viewport.width;
 		const viewportBottom = viewport.top + viewport.height;
+		const layoutViewportHeight = window.innerHeight;
 		const pad = 8;
 		const gap = 4;
 
@@ -192,21 +193,25 @@
 		const spaceAbove = anchorTop - viewport.top - gap - pad;
 		const spaceBelow = viewportBottom - anchorBottom - gap - pad;
 
-		let nextTop: number;
 		let availableHeight: number;
 
 		if (forceAbove || (preferAbove && (mh <= spaceAbove || spaceAbove >= spaceBelow))) {
 			availableHeight = spaceAbove;
-			const visibleMenuHeight = Math.min(mh, Math.max(0, availableHeight));
-			nextTop = anchorTop - gap - visibleMenuHeight;
+			pos = {
+				x: ax,
+				bottom: Math.max(pad, layoutViewportHeight - anchorTop + gap)
+			};
 		} else {
 			if (mh <= spaceBelow) {
 				availableHeight = spaceBelow;
-				nextTop = anchorBottom + gap;
+				const nextTop = Math.min(anchorBottom + gap, viewportBottom - pad - mh);
+				pos = { x: ax, top: Math.max(nextTop, viewport.top + pad) };
 			} else {
 				availableHeight = spaceAbove;
-				const visibleMenuHeight = Math.min(mh, Math.max(0, availableHeight));
-				nextTop = anchorTop - gap - visibleMenuHeight;
+				pos = {
+					x: ax,
+					bottom: Math.max(pad, layoutViewportHeight - anchorTop + gap)
+				};
 			}
 		}
 
@@ -214,9 +219,6 @@
 			availableHeight >= 0 && (forceAbove || mh > availableHeight || menuMaxHeight != null)
 				? Math.max(0, availableHeight)
 				: undefined;
-		const maxTop = viewportBottom - pad - (menuMaxHeight ?? mh);
-		nextTop = Math.min(Math.max(nextTop, viewport.top + pad), Math.max(viewport.top + pad, maxTop));
-		pos = { x: ax, top: nextTop };
 		ready = true;
 	}
 
@@ -330,7 +332,7 @@
 		: 'fixed'} z-[1001] min-w-36 rounded-xl bg-white dark:bg-[#1a1a1a] border border-gray-150 dark:border-white/6 shadow-xl p-0.5 flex flex-col overflow-hidden {className}"
 	style="{inlineAbove
 		? ''
-		: `left: ${pos.x}px; top: ${pos.top}px; ${menuMaxHeight
+		: `left: ${pos.x}px; ${pos.bottom != null ? `bottom: ${pos.bottom}px;` : `top: ${pos.top ?? -9999}px;`} ${menuMaxHeight
 				? `max-height: ${menuMaxHeight}px;`
 				: ''}`} {anchorWidth ? `width: ${anchorWidth}px;` : ''} opacity: {ready
 		? 1
