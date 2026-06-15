@@ -8,7 +8,7 @@
 	import ToggleSwitch from '../common/ToggleSwitch.svelte';
 	import Spinner from '../common/Spinner.svelte';
 	import AutomationModal from './AutomationModal.svelte';
-	import { openChatTab, sidebarOpen } from '$lib/stores';
+	import { sidebarOpen } from '$lib/stores';
 	import {
 		getAutomations,
 		toggleAutomation,
