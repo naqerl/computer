@@ -30,6 +30,7 @@ from cptr.utils.git import (
     stash_pop,
     stash_save,
     status,
+    uncommit,
     unstage,
 )
 
@@ -150,6 +151,8 @@ class RootRequest(BaseModel):
 class PushRequest(BaseModel):
     root: str
     force: bool = False
+    set_upstream: bool = False
+    branch: Optional[str] = None
 
 
 class StashSaveRequest(BaseModel):
@@ -244,7 +247,17 @@ async def git_pull(body: RootRequest):
 async def git_push(body: PushRequest):
     """Push to remote."""
     try:
-        return await push(body.root, body.force)
+        return await push(body.root, body.force, body.set_upstream, body.branch)
+    except GitError as e:
+        _handle_git_error(e)
+
+
+@router.post("/uncommit")
+async def git_uncommit(body: RootRequest):
+    """Undo the last commit, moving changes back to staging."""
+    await _require_repo(body.root)
+    try:
+        return await uncommit(body.root)
     except GitError as e:
         _handle_git_error(e)
 

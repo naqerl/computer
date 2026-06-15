@@ -500,6 +500,9 @@ def _to_responses_input(messages: list[dict], instructions: str) -> list[dict]:
                 }
             )
         elif role == "assistant" and m.get("tool_calls"):
+            # Emit reasoning items before function calls (required by reasoning models)
+            for ri in m.get("reasoning_items", []):
+                items.append(ri)
             for tc in m["tool_calls"]:
                 args = tc["function"].get("arguments", "{}")
                 call_id = tc.get("id", "")
@@ -603,6 +606,12 @@ async def stream_openai_responses(
                                     "call_id": item["call_id"],
                                     "name": item["name"],
                                     "arguments": json.loads(item["arguments"]),
+                                }
+                            elif item["type"] == "reasoning":
+                                # Reasoning items must be round-tripped for reasoning models
+                                yield {
+                                    "type": "reasoning",
+                                    "item": item,
                                 }
 
                         elif etype == "response.failed":

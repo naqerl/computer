@@ -597,6 +597,7 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
         # Reconstruct tool calls from output items for the provider
         if m.output:
             tool_calls = []
+            reasoning_items = []
             for item in m.output:
                 if item.get("type") == "function_call" and item.get("status") == "completed":
                     tc = {
@@ -611,8 +612,12 @@ async def _load_message_history(chat_id: str, message_id: str) -> tuple[list[dic
                     if item.get("fc_id"):
                         tc["fc_id"] = item["fc_id"]
                     tool_calls.append(tc)
+                elif item.get("type") == "reasoning":
+                    reasoning_items.append(item)
             if tool_calls:
                 entry["tool_calls"] = tool_calls
+                if reasoning_items:
+                    entry["reasoning_items"] = reasoning_items
 
             # Add tool results as separate messages
             for item in m.output:
@@ -644,7 +649,10 @@ def _parse_image_data_uri(result: str) -> tuple[str, str] | None:
         return None
 
 
-def _append_tool_to_messages(messages: list[dict], event: dict, result: str, provider: str):
+def _append_tool_to_messages(
+    messages: list[dict], event: dict, result: str, provider: str,
+    reasoning_items: list[dict] | None = None,
+):
     """Append a tool call + result to the message history for the next API call."""
     # Check for image result before truncation (data URI is large but needed)
     image = _parse_image_data_uri(result)
@@ -656,23 +664,25 @@ def _append_tool_to_messages(messages: list[dict], event: dict, result: str, pro
             result = result[:half] + "\n\n...(truncated)...\n\n" + result[-half:]
 
     # Add assistant message with tool_call
-    messages.append(
-        {
-            "role": "assistant",
-            "content": "",
-            "tool_calls": [
-                {
-                    "id": event["call_id"],
-                    "fc_id": event.get("id", ""),
-                    "type": "function",
-                    "function": {
-                        "name": event["name"],
-                        "arguments": json.dumps(event["arguments"]),
-                    },
-                }
-            ],
-        }
-    )
+    assistant_msg = {
+        "role": "assistant",
+        "content": "",
+        "tool_calls": [
+            {
+                "id": event["call_id"],
+                "fc_id": event.get("id", ""),
+                "type": "function",
+                "function": {
+                    "name": event["name"],
+                    "arguments": json.dumps(event["arguments"]),
+                },
+            }
+        ],
+    }
+    # Attach reasoning items for round-tripping (Responses API reasoning models)
+    if reasoning_items:
+        assistant_msg["reasoning_items"] = reasoning_items
+    messages.append(assistant_msg)
 
     if image:
         # Structured multimodal content — provider converters handle the
@@ -1029,6 +1039,7 @@ async def run_chat_task(
 
             restart = False
             pending_calls: list[dict] = []  # Collect tool calls from this response
+            pending_reasoning: list[dict] = []  # Reasoning items for round-tripping
 
             async for event in stream:
                 if event["type"] == "text_delta":
@@ -1040,6 +1051,10 @@ async def run_chat_task(
                 elif event["type"] == "tool_call":
                     # Collect tool call — don't execute yet
                     pending_calls.append(event)
+
+                elif event["type"] == "reasoning":
+                    # Collect reasoning items for round-tripping with tool calls
+                    pending_reasoning.append(event["item"])
 
                 elif event["type"] == "usage":
                     usage = {k: v for k, v in event.items() if k != "type"}
@@ -1102,6 +1117,9 @@ async def run_chat_task(
                 if needs_approval:
                     # First non-auto tool stops the loop for approval
                     tc = needs_approval
+                    # Store reasoning items before function_call for round-tripping
+                    for ri in pending_reasoning:
+                        output_items.append(ri)
                     item = {
                         "type": "function_call",
                         "id": str(uuid.uuid4()),
@@ -1125,7 +1143,9 @@ async def run_chat_task(
                     await emit(done=True)
                     return
 
-                # All calls are auto-approved — build UI items
+                # All calls are auto-approved — store reasoning + build UI items
+                for ri in pending_reasoning:
+                    output_items.append(ri)
                 call_items: list[tuple[dict, dict]] = []  # (event, ui_item)
                 for tc in pending_calls:
                     item = {
@@ -1176,7 +1196,9 @@ async def run_chat_task(
                         await emit(output=artifact_item)
                         _sync_state()
 
-                    _append_tool_to_messages(messages, tc, result, provider)
+                    # Only attach reasoning to the first tool call message
+                    ri = pending_reasoning if idx == other_indices[0] else None
+                    _append_tool_to_messages(messages, tc, result, provider, reasoning_items=ri)
                     new_messages_since += 2
 
                 # Execute delegate_task calls concurrently, emit each as it completes
@@ -1212,7 +1234,9 @@ async def run_chat_task(
                             await emit(output=item)
                             await emit(output=result_item)
                             _sync_state()
-                            _append_tool_to_messages(messages, tc, result, provider)
+                            # Attach reasoning to first delegate call if no sequential calls consumed it
+                            ri = pending_reasoning if not other_indices and idx == delegate_indices[0] else None
+                            _append_tool_to_messages(messages, tc, result, provider, reasoning_items=ri)
                             new_messages_since += 2
 
                 # Persist after all tool calls

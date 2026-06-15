@@ -11,6 +11,7 @@
 		gitCommit,
 		gitPull,
 		gitPush,
+		gitUncommit,
 		checkoutBranch,
 		createGitBranch
 	} from '$lib/apis/git';
@@ -58,6 +59,7 @@
 	let gitStatus = $derived(gitStatusStore.status as {
 		is_repo: boolean;
 		branch: string;
+		upstream: string;
 		ahead: number;
 		behind: number;
 		files: GitFile[];
@@ -193,6 +195,18 @@
 		await refresh();
 	}
 
+	async function doUncommit() {
+		loading = true;
+		try {
+			const d = await gitUncommit(workspacePath);
+			flash($t('git.uncommitted'));
+		} catch {
+			flash('Nothing to uncommit');
+		}
+		loading = false;
+		await refresh();
+	}
+
 	async function doPull() {
 		loading = true;
 		const d = await gitPull(workspacePath);
@@ -203,7 +217,11 @@
 
 	async function doPush() {
 		loading = true;
-		const d = await gitPush(workspacePath);
+		const needsPublish = !gitStatus?.upstream;
+		const d = await gitPush(workspacePath, {
+			set_upstream: needsPublish,
+			branch: needsPublish ? gitStatus?.branch : undefined
+		});
 		flash(d.ok ? $t('git.pushed') : d.message);
 		loading = false;
 		await refresh();
@@ -315,6 +333,8 @@
 				icon: 'upload',
 				action: doPush
 			};
+		if (!gitStatus.upstream)
+			return { label: $t('git.publish'), icon: 'upload', action: doPush };
 		return { label: $t('git.fetch'), icon: 'refresh', action: doPull };
 	});
 
@@ -713,6 +733,29 @@
 										{$t('git.commitToBranch', { branch: gitStatus.branch })}
 									{/if}
 								</button>
+
+								<!-- Push & Uncommit actions -->
+								{#if gitStatus.ahead > 0 || !gitStatus.upstream}
+									<div class="flex gap-1.5 mt-1.5">
+										<button
+											class="flex-1 flex items-center justify-center gap-1.5 h-7 rounded-lg text-[11px] font-medium transition-colors duration-75 border border-gray-200 dark:border-white/8 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/4"
+											disabled={loading}
+											onclick={doPush}
+										>
+											<Icon name="upload" size={11} />
+											<span>{gitStatus.ahead > 0 ? $t('git.pushCount', { count: gitStatus.ahead }) : $t('git.publish')}</span>
+										</button>
+										<button
+											class="flex items-center justify-center gap-1 h-7 px-2 rounded-lg text-[11px] font-medium transition-colors duration-75 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/4"
+											disabled={loading}
+											onclick={doUncommit}
+											use:tooltip={$t('git.uncommitTooltip')}
+										>
+											<Icon name="undo" size={11} />
+											<span>{$t('git.uncommit')}</span>
+										</button>
+									</div>
+								{/if}
 							</div>
 						{:else}
 							<!-- History: commit list -->

@@ -420,13 +420,39 @@ async def pull(root: str) -> dict[str, Any]:
     return {"ok": code == 0, "message": (out + err).strip()}
 
 
-async def push(root: str, force: bool = False) -> dict[str, Any]:
-    """Push to remote."""
+async def push(
+    root: str,
+    force: bool = False,
+    set_upstream: bool = False,
+    branch: str | None = None,
+    remote: str = "origin",
+) -> dict[str, Any]:
+    """Push to remote. Use *set_upstream* for first-time branch publish."""
     args = ["push"]
+    if set_upstream:
+        args.extend(["-u", remote, branch or "HEAD"])
     if force:
         args.append("--force-with-lease")
     code, out, err = await _run(*args, cwd=root, check=False)
     return {"ok": code == 0, "message": (out + err).strip()}
+
+
+async def uncommit(root: str) -> dict[str, str]:
+    """Undo the last commit, moving its changes back to the staging area.
+
+    Uses ``git reset --soft HEAD~1``.
+    """
+    # Grab info about the commit we're about to undo
+    _, log_out, _ = await _run(
+        "log", "-1", "--format=%H%x00%h%x00%s", cwd=root, check=False
+    )
+    parts = log_out.strip().split("\x00")
+    undone_hash = parts[1] if len(parts) >= 2 else ""
+    undone_msg = parts[2] if len(parts) >= 3 else ""
+
+    await _run("reset", "--soft", "HEAD~1", cwd=root)
+
+    return {"hash": undone_hash, "message": undone_msg}
 
 
 async def stash_list(root: str) -> list[dict[str, str]]:
