@@ -813,7 +813,7 @@ async def run_command(
     """Run a shell command. Returns a task_id for status checks and input.
     :param command: The shell command to execute.
     :param cwd: Working directory relative to workspace root.
-    :param wait: Seconds to wait for the command to finish before returning (max 120). Returns early if done sooner. Null returns immediately. Use 30-60 for installs and builds, 5-10 for quick commands, null or 0 for long-lived servers.
+    :param wait: Seconds to wait for the command to finish before returning (max 300). Returns early if done sooner. Null returns immediately. Use 30-60 for installs and builds, 5-10 for quick commands, null or 0 for long-lived servers.
     """
     work_dir = _resolve_path(cwd, workspace)
     if not work_dir.is_dir():
@@ -865,7 +865,7 @@ async def run_command(
         wait = EXECUTE_TIMEOUT
     if wait is not None and wait > 0:
         try:
-            await asyncio.wait_for(asyncio.shield(log_task), timeout=min(wait, 120))
+            await asyncio.wait_for(asyncio.shield(log_task), timeout=min(wait, 300))
         except asyncio.TimeoutError:
             pass
 
@@ -893,7 +893,7 @@ async def check_task(task_id: str, offset: int = 0, wait: Optional[int] = None, 
     """Check status and recent output of a background task.
     :param task_id: The task ID returned by run_command.
     :param offset: Byte offset from previous check. Pass next_offset from the last response to get only new output.
-    :param wait: Seconds to wait for the task to finish before returning (max 120). Returns early if done sooner. Null returns immediately.
+    :param wait: Seconds to wait for the task to finish before returning (max 300). Returns early if done sooner. Null returns immediately.
     """
     task = _bg_tasks.get(task_id)
     if not task:
@@ -907,7 +907,7 @@ async def check_task(task_id: str, offset: int = 0, wait: Optional[int] = None, 
         collect = task.get("log_task")
         if collect and not collect.done():
             try:
-                await asyncio.wait_for(asyncio.shield(collect), timeout=min(wait, 120))
+                await asyncio.wait_for(asyncio.shield(collect), timeout=min(wait, 300))
             except asyncio.TimeoutError:
                 pass
 
