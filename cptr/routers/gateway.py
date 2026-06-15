@@ -97,7 +97,7 @@ async def _authenticate(request: Request) -> str:
 @router.get("/models")
 async def list_models(request: Request):
     """List workspaces as OpenAI-format models."""
-    user_id = await _validate_bearer(request)
+    user_id = await _authenticate(request)
     workspaces = await Workspace.get_by_user(user_id)
 
     # Disambiguate basenames
