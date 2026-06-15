@@ -524,7 +524,7 @@ class BotManager:
                 return
 
             # Update bot config with new workspace
-            from cptr.utils.config import Config
+            from cptr.models import Config
             bots_raw = await Config.get("bots") or []
             for b in bots_raw:
                 if b.get("id") == bot["id"]:

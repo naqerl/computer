@@ -281,8 +281,11 @@ async def whatsapp_webhook_verify(bot_id: str, request: Request):
 @webhook_router.post("/whatsapp/{bot_id}")
 async def whatsapp_webhook_inbound(bot_id: str, request: Request):
     """Receive inbound WhatsApp messages via webhook."""
-    from cptr.utils.bridge import bot_manager
     payload = await request.json()
+
+    bot_manager = getattr(request.app.state, "bot_manager", None)
+    if not bot_manager:
+        raise HTTPException(503, "Bot manager not initialized")
 
     adapter = bot_manager._adapters.get(bot_id)
     if adapter:
