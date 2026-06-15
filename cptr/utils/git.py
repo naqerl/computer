@@ -232,12 +232,17 @@ async def unstage(root: str, files: list[str]) -> None:
 
 
 async def discard(root: str, files: list[str]) -> None:
-    """Discard changes in files. Tracked files are restored via git checkout;
-    untracked files are deleted from disk."""
+    """Fully discard all changes for files — both staged and unstaged.
+
+    Tracked modified/deleted files are unstaged then restored via checkout.
+    Newly added (staged) files are unstaged then deleted from disk.
+    Untracked files are deleted from disk.
+    """
     if not files:
         return
 
-    # Determine which files are untracked
+    requested = set(files)
+
     _, st_out, _ = await _run(
         "status",
         "--porcelain=v2",
@@ -245,17 +250,48 @@ async def discard(root: str, files: list[str]) -> None:
         cwd=root,
         check=False,
     )
-    untracked = set()
+
+    to_unstage: list[str] = []   # staged changes that need unstaging first
+    to_checkout: list[str] = []  # working-tree changes to restore from HEAD
+    to_delete: list[str] = []    # untracked / newly-added files to remove
+
     for line in st_out.splitlines():
         if line.startswith("? "):
-            untracked.add(line[2:])
+            path = line[2:]
+            if path in requested:
+                to_delete.append(path)
+        elif line.startswith("1 ") or line.startswith("2 "):
+            parts = line.split(" ", 8)
+            xy = parts[1]
+            path = parts[-1]
+            if line.startswith("2 "):
+                path = path.split("\t")[0]
+            if path not in requested:
+                continue
+            staged_code = xy[0]
+            unstaged_code = xy[1]
+            if staged_code == "A":
+                # Newly added file: unstage → becomes untracked → delete
+                to_unstage.append(path)
+                to_delete.append(path)
+            elif staged_code != ".":
+                # Staged modification/deletion: unstage then checkout
+                to_unstage.append(path)
+                to_checkout.append(path)
+            if unstaged_code != "." and staged_code != "A":
+                # Working-tree change: checkout (deduplicated)
+                if path not in to_checkout:
+                    to_checkout.append(path)
 
-    tracked = [f for f in files if f not in untracked]
-    to_delete = [f for f in files if f in untracked]
+    # 1. Unstage any staged changes (reverts index to HEAD)
+    if to_unstage:
+        await _run("restore", "--staged", "--", *to_unstage, cwd=root)
 
-    if tracked:
-        await _run("checkout", "--", *tracked, cwd=root)
+    # 2. Restore working-tree files from HEAD
+    if to_checkout:
+        await _run("checkout", "--", *to_checkout, cwd=root)
 
+    # 3. Remove untracked / newly-added files
     for f in to_delete:
         full = os.path.join(root, f)
         if os.path.isfile(full):
