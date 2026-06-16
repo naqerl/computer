@@ -7,8 +7,10 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from typing import Optional
 
-from cptr.utils.config import AuthResult, check_access, hash_password, now_ms
+from cptr.routers.chat import invalidate_model_cache
 from cptr.models import User, Auth, Config
+from cptr.utils.config import AuthResult, _get_jwt_secret, check_access, hash_password, now_ms
+from cptr.utils.crypto import decrypt_key, encrypt_key, mask_key
 
 router = APIRouter(prefix="/api/admin", tags=["admin"])
 
@@ -128,19 +130,26 @@ async def get_config_namespace(namespace: str, request: Request):
     return {"config": await Config.get_namespace(namespace)}
 
 
+def _prepare_config_updates(updates: dict) -> dict:
+    """Normalize sensitive config values before persisting them."""
+    prepared = dict(updates)
+    secret = _get_jwt_secret()
+    for key in ("audio.stt_api_key", "audio.tts_api_key"):
+        value = prepared.get(key)
+        if isinstance(value, str) and value and not value.startswith("encrypted:"):
+            prepared[key] = encrypt_key(value, secret)
+    return prepared
+
+
 @router.put("/config")
 async def put_config(body: ConfigUpdateRequest, request: Request):
     """Update config keys. Upserts each key."""
     require_admin(request)
-    await Config.upsert(body.config)
+    await Config.upsert(_prepare_config_updates(body.config))
     return {"ok": True}
 
 
 # ── Connections ──────────────────────────────────────────────
-
-from cptr.utils.crypto import encrypt_key, decrypt_key, mask_key
-from cptr.utils.config import _get_jwt_secret
-from cptr.routers.chat import invalidate_model_cache
 
 
 async def _get_connections() -> list[dict]:

@@ -8,7 +8,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import platform
+import re
 import uuid
+from datetime import date
 from pathlib import Path
 
 from cptr.env import CHAT_MAX_ITERATIONS, CHAT_TOOL_MAX_CHARS
@@ -317,10 +320,6 @@ def _load_instruction_files(workspace: str, max_bytes: int = 32_000) -> str:
 
 # ── Template engine ─────────────────────────────────────────
 
-import platform
-import re
-from datetime import date
-
 _TEMPLATE_RE = re.compile(r"\{\{(\w+)\}\}")
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -436,6 +435,24 @@ async def _load_system_prompt(workspace: str, model: str = "") -> str:
     # Render template variables
     variables = _build_template_variables(workspace, model)
     return _render_template(template, variables)
+
+
+VOICE_MODE_SYSTEM_PROMPT = (
+    "You are in voice mode. Keep responses brief, conversational, and easy to hear aloud. "
+    "Prefer one or two short paragraphs. Ask at most one focused follow-up question when needed. "
+    "Avoid long lists, code blocks, tables, and verbose explanations unless the user explicitly asks."
+)
+
+
+async def _apply_voice_mode_system_prompt(system: str, chat_params: dict) -> str:
+    if chat_params.get("voice_mode") is not True:
+        return system
+    prompt = str(
+        (await Config.get("audio.voice_mode_system_prompt")) or VOICE_MODE_SYSTEM_PROMPT
+    ).strip()
+    if not prompt:
+        return system
+    return f"{system}\n\n[VOICE MODE]\n{prompt}"
 
 
 # ── Title generation ────────────────────────────────────────
@@ -1156,6 +1173,8 @@ async def run_chat_task(
         api_key = decrypt_key(connection.get("api_key", ""), _get_jwt_secret())
         base_url = connection.get("base_url") or _default_base_url(provider)
 
+        chat_obj = await Chat.get_by_id(chat_id)
+        chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
         system = await _load_system_prompt(workspace, model)
         messages, loaded_summary = await _load_message_history(chat_id, message_id)
         if loaded_summary:
@@ -1170,12 +1189,10 @@ async def run_chat_task(
             tools = [t for t in tools if t["name"] != "view_skill"]
 
         # Strip delegate_task from sub-agent chats (depth limit = 1)
-        chat_obj = await Chat.get_by_id(chat_id)
         if chat_obj and (chat_obj.meta or {}).get("subagent"):
             tools = [t for t in tools if t["name"] != "delegate_task"]
 
         # Parse $skill-name mentions from the user message to auto-activate skills
-        chat_params = (chat_obj.meta or {}).get("params", {}) if chat_obj else {}
         attached_skill_ids: list[str] = []
         if skills and messages:
             # Find the last user message
@@ -1199,6 +1216,8 @@ async def run_chat_task(
                     _activated_skills.add(sid)  # mark as activated for dedup
             if skill_blocks:
                 system += "\n\n" + "\n\n".join(skill_blocks)
+
+        system = await _apply_voice_mode_system_prompt(system, chat_params)
 
         # Plan mode: strip write tools, inject prompt as user message (not system, to preserve cache)
         plan_mode = chat_params.get("plan_mode", False)
@@ -1271,6 +1290,7 @@ async def run_chat_task(
                             skill_blocks.append(format_skill_content(skill))
                     if skill_blocks:
                         system += "\n\n" + "\n\n".join(skill_blocks)
+                system = await _apply_voice_mode_system_prompt(system, chat_params)
                 messages = keep_zone
                 last_usage = None  # reset after compaction
                 new_messages_since = 0

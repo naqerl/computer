@@ -41,6 +41,13 @@ export interface SendMessageResult {
 	assistant_message?: ChatMessageRow;
 }
 
+export interface ChatSendParams {
+	tool_approval_mode?: string;
+	plan_mode?: boolean;
+	request_params?: Record<string, unknown>;
+	voice_mode?: boolean;
+}
+
 // ── Queries ─────────────────────────────────────────────────
 
 export const getChats = (
@@ -67,7 +74,7 @@ export const sendMessage = (
 	workspace: string,
 	chatId?: string,
 	parentId?: string | null,
-	params: { tool_approval_mode?: string; plan_mode?: boolean; request_params?: Record<string, unknown> } = {},
+	params: ChatSendParams = {},
 	regenerationPrompt?: string,
 	files?: { id: string; name: string; url: string; type: string }[]
 ) =>

@@ -7,6 +7,8 @@
 	import ReasoningCollapsible from './ReasoningCollapsible.svelte';
 	import ToolCallCollapsible from './ToolCallCollapsible.svelte';
 	import { currentWorkspace, openFileTab } from '$lib/stores';
+	import { ttsConfigured, ttsEnabled } from '$lib/stores/audio';
+	import Icon from '../Icon.svelte';
 	import { t } from '$lib/i18n';
 
 	interface Props {
@@ -18,10 +20,12 @@
 		messageId: string;
 		siblingIndex?: number;
 		siblingTotal?: number;
+		speaking?: boolean;
 		onapprove: (messageId: string, callId: string, approved: boolean) => void;
 		onnavigate?: (direction: -1 | 1) => void;
 		onregenerate?: () => void;
 		onedit?: (content: string, output: any[] | null, submit: boolean) => void;
+		onspeak?: () => void;
 	}
 	let {
 		content,
@@ -32,10 +36,12 @@
 		messageId,
 		siblingIndex = 0,
 		siblingTotal = 1,
+		speaking = false,
 		onapprove,
 		onnavigate,
 		onregenerate,
-		onedit
+		onedit,
+		onspeak
 	}: Props = $props();
 
 	let edit = $state(false);
@@ -533,6 +539,19 @@
 								/></svg
 							>
 						{/if}
+					</button>
+				{/if}
+				{#if done && $ttsEnabled && $ttsConfigured}
+					<button
+						class="p-0.5 rounded transition-colors duration-100
+							{speaking
+							? 'text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-white/10'
+							: 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-300'}"
+						onclick={onspeak}
+						aria-label={speaking ? $t('chat.stopSpeaking') : $t('chat.speakResponses')}
+						title={speaking ? $t('chat.stopSpeaking') : $t('chat.speakResponses')}
+					>
+						<Icon name="speaker" size={14} />
 					</button>
 				{/if}
 				{#if done && onregenerate}

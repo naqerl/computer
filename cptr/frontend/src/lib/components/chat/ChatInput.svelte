@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { mount, unmount } from 'svelte';
 	import { Editor } from '@tiptap/core';
 	import StarterKit from '@tiptap/starter-kit';
@@ -22,6 +22,7 @@
 	import QueuedMessageItem from './QueuedMessageItem.svelte';
 	import Icon from '../Icon.svelte';
 	import { planMode } from '$lib/stores';
+	import { ttsConfigured, ttsEnabled, voiceModeEnabled } from '$lib/stores/audio';
 	import Spinner from '$lib/components/common/Spinner.svelte';
 	import { t } from '$lib/i18n';
 
@@ -56,6 +57,21 @@
 
 	let editorEl: HTMLDivElement | undefined = $state();
 	let editor: Editor | null = $state(null);
+	let voiceListening = $state(false);
+	let voiceWaitingForResponse = $state(false);
+	let voiceSawStreaming = $state(false);
+	let voiceRecognition: any = null;
+	let voiceRestartTimer = 0;
+	let voiceStopRequested = false;
+	let voiceRearming = $state(false);
+	const voiceModeAvailable = $derived($ttsEnabled && $ttsConfigured);
+	const voiceStatusLabel = $derived(
+		voiceWaitingForResponse || streaming || sending
+			? $t('chat.voiceWaiting')
+			: voiceListening || voiceRearming || $voiceModeEnabled
+				? $t('chat.voiceListening')
+				: $t('chat.voiceModeOn')
+	);
 
 	// ── Lowlight setup ──────────────────────────────
 	const lowlight = createLowlight(all);
@@ -485,6 +501,8 @@
 	});
 
 	onDestroy(() => {
+		stopVoiceRecognition();
+		if (voiceRestartTimer) clearTimeout(voiceRestartTimer);
 		destroyPopup();
 		destroySkillPopup();
 		editor?.destroy();
@@ -525,8 +543,161 @@
 		return extractMentionedSkills(editor.getJSON());
 	}
 
+	function clearVoiceRestartTimer(resetRearming = true) {
+		if (voiceRestartTimer) {
+			clearTimeout(voiceRestartTimer);
+			voiceRestartTimer = 0;
+		}
+		if (resetRearming) voiceRearming = false;
+	}
+
+	function scheduleVoiceRestart(delay = 350) {
+		clearVoiceRestartTimer();
+		if (
+			!voiceModeAvailable ||
+			!$voiceModeEnabled ||
+			voiceWaitingForResponse ||
+			voiceListening ||
+			voiceRecognition ||
+			streaming ||
+			sending ||
+			inputText.trim()
+		) return;
+		voiceRearming = true;
+		voiceRestartTimer = window.setTimeout(() => {
+			voiceRestartTimer = 0;
+			voiceRearming = false;
+			startVoiceRecognition();
+		}, delay);
+	}
+
+	function stopVoiceRecognition() {
+		clearVoiceRestartTimer();
+		const recognition = voiceRecognition;
+		voiceRecognition = null;
+		voiceStopRequested = true;
+		try {
+			recognition?.stop();
+		} catch {}
+		voiceListening = false;
+	}
+
+	function startVoiceRecognition() {
+		clearVoiceRestartTimer(false);
+		if (
+			!voiceModeAvailable ||
+			!$voiceModeEnabled ||
+			voiceWaitingForResponse ||
+			voiceListening ||
+			voiceRecognition ||
+			streaming ||
+			sending ||
+			inputText.trim()
+		) {
+			voiceRearming = false;
+			return;
+		}
+
+		const SpeechRecognition =
+			(window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+		if (!SpeechRecognition) {
+			alert($t('chat.dictate.unsupported'));
+			voiceModeEnabled.set(false);
+			voiceRearming = false;
+			return;
+		}
+
+		const recognition = new SpeechRecognition();
+		voiceRecognition = recognition;
+		voiceStopRequested = false;
+		recognition.continuous = true;
+		recognition.interimResults = true;
+		recognition.lang = navigator.language || 'en-US';
+
+		recognition.onresult = async (event: any) => {
+			let text = '';
+			for (let i = event.resultIndex; i < event.results.length; i++) {
+				const result = event.results[i];
+				if (result?.isFinal) text += ` ${result[0]?.transcript || ''}`;
+			}
+			text = text.trim();
+			if (!text) return;
+			inputText = text;
+			voiceWaitingForResponse = true;
+			voiceSawStreaming = false;
+			stopVoiceRecognition();
+			await tick();
+			onsend();
+		};
+
+		recognition.onerror = (event: any) => {
+			voiceListening = false;
+			if (event?.error === 'not-allowed' || event?.error === 'service-not-allowed') {
+				voiceModeEnabled.set(false);
+				stopVoiceRecognition();
+			}
+		};
+
+		recognition.onend = () => {
+			if (voiceRecognition !== recognition) return;
+			voiceRecognition = null;
+			voiceListening = false;
+			if (!voiceStopRequested) scheduleVoiceRestart(1200);
+			voiceStopRequested = false;
+		};
+
+		try {
+			recognition.start();
+			voiceListening = true;
+			voiceRearming = false;
+		} catch {
+			voiceRecognition = null;
+			voiceListening = false;
+			voiceRearming = false;
+			scheduleVoiceRestart(1500);
+		}
+	}
+
+	function toggleVoiceMode() {
+		if (!voiceModeAvailable) {
+			alert($t('chat.ttsNotConfigured'));
+			return;
+		}
+		const next = !$voiceModeEnabled;
+		voiceModeEnabled.set(next);
+		if (next) {
+			voiceWaitingForResponse = false;
+			voiceSawStreaming = false;
+			startVoiceRecognition();
+		} else {
+			voiceWaitingForResponse = false;
+			voiceSawStreaming = false;
+			stopVoiceRecognition();
+		}
+	}
+
+	$effect(() => {
+		if (!voiceModeAvailable && $voiceModeEnabled) {
+			voiceModeEnabled.set(false);
+			stopVoiceRecognition();
+		}
+		if (!$voiceModeEnabled) return;
+		if (streaming) voiceSawStreaming = true;
+		if (voiceSawStreaming && !streaming && !sending) {
+			voiceWaitingForResponse = false;
+			voiceSawStreaming = false;
+			scheduleVoiceRestart(500);
+		}
+	});
+
+	$effect(() => {
+		if ($voiceModeEnabled && inputText.trim()) {
+			stopVoiceRecognition();
+		}
+	});
+
 	// Allow sending during streaming (message will be enqueued server-side)
-	const canSend = $derived(inputText.trim() && selectedModel && !sending);
+	const canSend = $derived(!!(inputText.trim() && selectedModel && !sending));
 </script>
 
 <div 
@@ -600,6 +771,15 @@
 		{/if}
 		<!-- Editor area -->
 		<div class="px-2.5">
+			{#if $voiceModeEnabled}
+				<div class="pt-2 flex items-center gap-2 text-[11px] font-medium text-gray-600 dark:text-gray-300">
+					<span class="relative flex size-2">
+						<span class="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-70 {voiceListening ? 'animate-ping' : ''}"></span>
+						<span class="relative inline-flex size-2 rounded-full bg-emerald-500"></span>
+					</span>
+					<span>{voiceStatusLabel}</span>
+				</div>
+			{/if}
 			<div
 				bind:this={editorEl}
 				class="chat-editor-mount scrollbar-hidden"
@@ -666,7 +846,14 @@
 						inputText += text;
 					}}
 				/>
-				<SendButton {canSend} {streaming} {onsend} {oncancel} />
+				<SendButton
+					{canSend}
+					{streaming}
+					{onsend}
+					{oncancel}
+					onvoice={voiceModeAvailable ? toggleVoiceMode : undefined}
+					voiceActive={$voiceModeEnabled || voiceListening}
+				/>
 			</div>
 		</div>
 	</div>

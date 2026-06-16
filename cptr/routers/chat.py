@@ -8,44 +8,18 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from cptr.models import Chat, ChatMessage, Config
 from cptr.utils.config import check_access, now_ms, _get_jwt_secret
 from cptr.utils.crypto import decrypt_key
+from cptr.utils.workspace import ensure_cptr_gitignored
 
 log = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/chats", tags=["chats"])
 
 COOKIE_NAME = "cptr_session"
-
-
-def _ensure_gitignore(workspace: str) -> None:
-    """If workspace is a git repo, ensure .cptr is listed in .gitignore."""
-    ws = Path(workspace)
-    if not (ws / ".git").exists():
-        return
-
-    gitignore = ws / ".gitignore"
-    entry = ".cptr"
-
-    # Check if already ignored
-    if gitignore.exists():
-        content = gitignore.read_text(encoding="utf-8", errors="replace")
-        # Match .cptr as a standalone line (not a substring of something else)
-        for line in content.splitlines():
-            stripped = line.strip()
-            if stripped == entry or stripped == entry + "/":
-                return
-        # Append with a preceding newline if file doesn't end with one
-        if content and not content.endswith("\n"):
-            content += "\n"
-        content += f"{entry}\n"
-        gitignore.write_text(content, encoding="utf-8")
-    else:
-        gitignore.write_text(f"{entry}\n", encoding="utf-8")
 
 
 def _get_user(request: Request) -> str:
@@ -389,7 +363,7 @@ async def send_message(body: SendMessageRequest, request: Request):
         await asyncio.to_thread(lambda: chats_dir.mkdir(parents=True, exist_ok=True))
 
         # Auto-add .cptr to .gitignore if this is a git repo
-        await asyncio.to_thread(_ensure_gitignore, body.workspace)
+        await asyncio.to_thread(ensure_cptr_gitignored, body.workspace)
 
     # Check if the chat has an in-progress assistant message.
     # If so, queue this message instead of starting a new task.

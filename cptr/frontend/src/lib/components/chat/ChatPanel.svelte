@@ -12,6 +12,7 @@
 		queueSendNow as apiQueueSendNow,
 		queueDelete as apiQueueDelete,
 		type ChatMessageRow,
+		type ChatSendParams,
 		type ChatInfo
 	} from '$lib/apis/chat';
 	import {
@@ -32,6 +33,14 @@
 		selectedModelId,
 		requestParams
 	} from '$lib/stores';
+	import {
+		ttsEnabled,
+		ttsConfigured,
+		ttsFormat,
+		ttsPlaybackEnabled,
+		ttsVoice,
+		voiceModeEnabled
+	} from '$lib/stores/audio';
 
 	import ChatInput from './ChatInput.svelte';
 	import UserMessage from './UserMessage.svelte';
@@ -60,6 +69,20 @@
 	let autoScroll = $state(true);
 	let cancelledMessageId: string | null = null;
 	let loading = $state(!!initialChatId);
+	let ttsQueue: string[] = [];
+	let ttsBuffer = '';
+	let ttsInsideCodeFence = false;
+	let ttsPlaying = false;
+	let ttsGeneration = 0;
+	let ttsAbort: AbortController | null = null;
+	let ttsAudio: HTMLAudioElement | null = null;
+	let ttsObjectUrl: string | null = null;
+	let ttsErrorShown = false;
+	let speakingMessageId = $state<string | null>(null);
+	let ttsStopRequested = false;
+	let ttsAudioCacheBytes = 0;
+	const ttsAudioCache = new Map<string, Blob>();
+	const TTS_AUDIO_CACHE_LIMIT_BYTES = 20 * 1024 * 1024;
 
 	// ── Windowed rendering ──────────────────────────────────────
 	// Only render the last N turns to keep the DOM light for long chats.
@@ -216,6 +239,7 @@
 	let loadGeneration = 0;
 
 	async function loadChat(id: string) {
+		if (chatId && chatId !== id) stopTtsPlayback();
 		chatId = id;
 		const gen = ++loadGeneration;
 		// Only show loading spinner on initial load (no messages yet).
@@ -356,8 +380,13 @@
 		if (data.delta) {
 			msg.content += data.delta;
 			allMessages = [...allMessages];
+			handleTtsDelta(data.message_id, data.delta);
 		}
 		if (data.output) {
+			if (data.output.type === 'function_call') {
+				if (data.output.status === 'pending') stopTtsPlayback();
+				else resetTtsBuffer();
+			}
 			// Merge by call_id to avoid duplicates and update status of existing items
 			const existing = msg.output || [];
 			const callId = data.output.call_id;
@@ -395,6 +424,7 @@
 			toast.error(data.error, { duration: 8000 });
 		}
 		if (data.done) {
+			flushTtsBuffer();
 			// Clear streaming indicator for this tab
 			if (tabId) {
 				streamingChatTabs.update((s) => {
@@ -450,6 +480,7 @@
 	});
 
 	onDestroy(() => {
+		stopTtsPlayback();
 		const socket = socketStore.getSocket();
 		if (socket) {
 			socket.off('events:chat', handleSocketEvent);
@@ -459,6 +490,16 @@
 		// Don't clear streamingChatTabs here -- the global listener in
 		// chat.ts handles cleanup when the "done" event arrives, so the
 		// spinner persists even when the chat tab is not active.
+	});
+
+	$effect(() => {
+		if (!$ttsEnabled || !$ttsConfigured) {
+			voiceModeEnabled.set(false);
+			ttsPlaybackEnabled.set(false);
+			stopTtsPlayback();
+		} else if ((!$ttsPlaybackEnabled && !$voiceModeEnabled) || !$ttsConfigured) {
+			stopTtsPlayback();
+		}
 	});
 
 	// ── Persist model selection ─────────────────────────────────
@@ -528,10 +569,21 @@
 
 	// ── Actions ─────────────────────────────────────────────────
 
+	function getChatSendParams(): ChatSendParams {
+		const params: ChatSendParams = {
+			tool_approval_mode: get(toolApprovalMode),
+			plan_mode: get(planMode),
+			request_params: get(requestParams)
+		};
+		if (get(voiceModeEnabled)) params.voice_mode = true;
+		return params;
+	}
+
 	async function send() {
 		let text = inputText.trim();
 		if (!text || !selectedModel) return;
 		if (sending) return;
+		stopTtsPlayback();
 		sending = true;
 		const files = chatInputEl?.getFiles() ?? [];
 		// Transform TipTap mention format to markdown file links
@@ -565,18 +617,13 @@
 				}
 			} else {
 				try {
-					const mode = get(toolApprovalMode);
 					const result = await apiSendMessage(
 						text,
 						selectedModel,
 						workspace,
 						chatId,
 						parentId,
-						{
-							tool_approval_mode: mode,
-							plan_mode: get(planMode),
-							request_params: get(requestParams)
-						},
+						getChatSendParams(),
 						undefined,
 						files
 					);
@@ -634,14 +681,13 @@
 		}
 
 		try {
-			const mode = get(toolApprovalMode);
 			const result = await apiSendMessage(
 				text,
 				selectedModel,
 				workspace,
 				chatId ?? undefined,
 				parentId,
-				{ tool_approval_mode: mode, plan_mode: get(planMode), request_params: get(requestParams) },
+				getChatSendParams(),
 				undefined,
 				files
 			);
@@ -711,6 +757,7 @@
 	async function handleCancel() {
 		const active = allMessages.find((m) => m.role === 'assistant' && !m.done);
 		if (!active || !chatId) return;
+		stopTtsPlayback();
 
 		// Tell the socket handler to skip the reload for this message
 		cancelledMessageId = active.id;
@@ -799,12 +846,14 @@
 		if (!msg?.parent_id || !chatId || !selectedModel) return;
 
 		try {
-			const mode = get(toolApprovalMode);
-			const result = await apiSendMessage('', selectedModel, workspace, chatId, msg.parent_id, {
-				tool_approval_mode: mode,
-				plan_mode: get(planMode),
-				request_params: get(requestParams)
-			});
+			const result = await apiSendMessage(
+				'',
+				selectedModel,
+				workspace,
+				chatId,
+				msg.parent_id,
+				getChatSendParams()
+			);
 			if (result.assistant_message) {
 				allMessages = [...allMessages, result.assistant_message];
 				currentMessageId = result.message_id;
@@ -846,11 +895,7 @@
 					workspace,
 					chatId,
 					msg.parent_id,
-					{
-						tool_approval_mode: get(toolApprovalMode),
-						plan_mode: get(planMode),
-						request_params: get(requestParams)
-					}
+					getChatSendParams()
 				);
 				if (result.user_message && result.assistant_message) {
 					allMessages = [...allMessages, result.user_message, result.assistant_message];
@@ -887,6 +932,244 @@
 				}))
 			};
 		});
+	}
+
+	function shouldUseTts() {
+		return $ttsEnabled && $ttsConfigured && ($ttsPlaybackEnabled || $voiceModeEnabled);
+	}
+
+	function resetTtsBuffer() {
+		ttsBuffer = '';
+		ttsInsideCodeFence = false;
+	}
+
+	function stopTtsPlayback() {
+		ttsStopRequested = true;
+		ttsGeneration += 1;
+		ttsQueue = [];
+		resetTtsBuffer();
+		ttsAbort?.abort();
+		ttsAbort = null;
+		if (ttsAudio) {
+			ttsAudio.pause();
+			ttsAudio.src = '';
+			ttsAudio = null;
+		}
+		if (ttsObjectUrl) {
+			URL.revokeObjectURL(ttsObjectUrl);
+			ttsObjectUrl = null;
+		}
+		ttsPlaying = false;
+		speakingMessageId = null;
+	}
+
+	function stripCodeFenceDelta(delta: string): string {
+		let out = '';
+		for (let i = 0; i < delta.length; i++) {
+			if (delta.startsWith('```', i)) {
+				ttsInsideCodeFence = !ttsInsideCodeFence;
+				i += 2;
+				continue;
+			}
+			if (!ttsInsideCodeFence) out += delta[i];
+		}
+		return out;
+	}
+
+	function cleanSpeechText(text: string): string {
+		return text
+			.replace(/```[\s\S]*?```/g, ' ')
+			.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+			.replace(/`([^`]+)`/g, '$1')
+			.replace(/^#{1,6}\s+/gm, '')
+			.replace(/^\s*[-*+]\s+/gm, '')
+			.replace(/\s+/g, ' ')
+			.trim();
+	}
+
+	function findSpeechBoundary(text: string): number {
+		if (text.length < 60) return -1;
+		for (let i = 40; i < text.length; i++) {
+			const ch = text[i];
+			const next = text[i + 1] || '';
+			if ((ch === '.' || ch === '!' || ch === '?' || ch === '\n') && (!next || /\s/.test(next))) {
+				return i + 1;
+			}
+		}
+		if (text.length > 220) {
+			const idx = text.lastIndexOf(' ', 220);
+			return idx > 80 ? idx : 220;
+		}
+		return -1;
+	}
+
+	function handleTtsDelta(messageId: string, delta: string) {
+		if (!shouldUseTts()) return;
+		if (!delta.trim()) return;
+
+		const active = allMessages.find((m) => m.id === messageId);
+		if (!active || active.role !== 'assistant') return;
+
+		const speakable = stripCodeFenceDelta(delta);
+		if (!speakable.trim()) return;
+
+		ttsBuffer += speakable;
+		let boundary = findSpeechBoundary(ttsBuffer);
+		while (boundary > 0) {
+			const chunk = cleanSpeechText(ttsBuffer.slice(0, boundary));
+			ttsBuffer = ttsBuffer.slice(boundary);
+			if (chunk.length > 1) enqueueSpeech(chunk);
+			boundary = findSpeechBoundary(ttsBuffer);
+		}
+	}
+
+	function flushTtsBuffer() {
+		if (!shouldUseTts()) return;
+		const chunk = cleanSpeechText(ttsBuffer);
+		resetTtsBuffer();
+		if (chunk.length > 1) enqueueSpeech(chunk);
+	}
+
+	function enqueueSpeech(text: string) {
+		ttsQueue = [...ttsQueue, text];
+		if (!ttsPlaying) void playTtsQueue(ttsGeneration);
+	}
+
+	function chunkSpeechText(text: string): string[] {
+		const chunks: string[] = [];
+		let remaining = cleanSpeechText(text);
+		while (remaining) {
+			const boundary = findSpeechBoundary(remaining);
+			const end = boundary > 0 ? boundary : remaining.length;
+			const chunk = cleanSpeechText(remaining.slice(0, end));
+			if (chunk.length > 1) chunks.push(chunk);
+			remaining = remaining.slice(end).trimStart();
+		}
+		return chunks;
+	}
+
+	function getAssistantSpeechText(msg: ChatMessageRow): string {
+		const outputText = (msg.output || [])
+			.filter((item: any) => item.type === 'message')
+			.flatMap((item: any) => item.content || [])
+			.map((part: any) => part.text || part.content || '')
+			.join(' ');
+		return cleanSpeechText(outputText || msg.content || '');
+	}
+
+	function speakMessage(messageId: string) {
+		const msg = allMessages.find((m) => m.id === messageId && m.role === 'assistant');
+		if (!msg || !$ttsEnabled || !$ttsConfigured) return;
+		const text = getAssistantSpeechText(msg);
+		if (!text) return;
+		if (speakingMessageId === messageId && ttsPlaying && $ttsPlaybackEnabled) {
+			ttsPlaybackEnabled.set(false);
+			stopTtsPlayback();
+			return;
+		}
+		stopTtsPlayback();
+		speakingMessageId = messageId;
+		ttsPlaybackEnabled.set(true);
+		ttsErrorShown = false;
+		for (const chunk of chunkSpeechText(text)) enqueueSpeech(chunk);
+	}
+
+	function ttsCacheKey(text: string): string {
+		return [$ttsVoice, $ttsFormat, text].join('\u001f');
+	}
+
+	function getCachedTtsAudio(key: string): Blob | null {
+		const cached = ttsAudioCache.get(key);
+		if (!cached) return null;
+		ttsAudioCache.delete(key);
+		ttsAudioCache.set(key, cached);
+		return cached;
+	}
+
+	function cacheTtsAudio(key: string, blob: Blob) {
+		if (blob.size > TTS_AUDIO_CACHE_LIMIT_BYTES) return;
+		const existing = ttsAudioCache.get(key);
+		if (existing) {
+			ttsAudioCacheBytes -= existing.size;
+			ttsAudioCache.delete(key);
+		}
+		while (ttsAudioCacheBytes + blob.size > TTS_AUDIO_CACHE_LIMIT_BYTES) {
+			const oldest = ttsAudioCache.entries().next().value;
+			if (!oldest) break;
+			ttsAudioCache.delete(oldest[0]);
+			ttsAudioCacheBytes -= oldest[1].size;
+		}
+		ttsAudioCache.set(key, blob);
+		ttsAudioCacheBytes += blob.size;
+	}
+
+	async function playTtsQueue(generation: number) {
+		ttsPlaying = true;
+		try {
+			while (generation === ttsGeneration && ttsQueue.length > 0) {
+				if (!shouldUseTts()) break;
+				const text = ttsQueue.shift();
+				if (!text) continue;
+
+				const cacheKey = ttsCacheKey(text);
+				let blob = getCachedTtsAudio(cacheKey);
+				if (!blob) {
+					ttsAbort = new AbortController();
+					const response = await fetch('/api/audio/speech', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({ text, voice: $ttsVoice, workspace }),
+						signal: ttsAbort.signal
+					});
+					if (!response.ok) {
+						if (!ttsErrorShown) {
+							ttsErrorShown = true;
+							let detail = `${response.status}`;
+							try {
+								const data = await response.json();
+								detail = data?.detail || data?.error || detail;
+							} catch {}
+							toast.error($t('admin.audio.tts') + ': ' + detail);
+						}
+						ttsPlaybackEnabled.set(false);
+						voiceModeEnabled.set(false);
+						break;
+					}
+					blob = await response.blob();
+					cacheTtsAudio(cacheKey, blob);
+				}
+
+				if (generation !== ttsGeneration) break;
+				if (ttsObjectUrl) URL.revokeObjectURL(ttsObjectUrl);
+				ttsObjectUrl = URL.createObjectURL(blob);
+				ttsAudio = new Audio(ttsObjectUrl);
+				await new Promise<void>((resolve, reject) => {
+					const audio = ttsAudio!;
+					audio.onended = () => resolve();
+					audio.onerror = () => {
+						if (ttsStopRequested || generation !== ttsGeneration) resolve();
+						else reject(new Error('audio playback failed'));
+					};
+					const started = audio.play();
+					if (started) started.catch(reject);
+				});
+				if (ttsObjectUrl) {
+					URL.revokeObjectURL(ttsObjectUrl);
+					ttsObjectUrl = null;
+				}
+				ttsAudio = null;
+				ttsAbort = null;
+			}
+		} catch (err: any) {
+			if (!ttsStopRequested && err?.name !== 'AbortError' && !ttsErrorShown) {
+				ttsErrorShown = true;
+				toast.error($t('admin.audio.tts') + ': playback failed');
+			}
+		} finally {
+			if (generation === ttsGeneration) ttsPlaying = false;
+			if (generation === ttsGeneration) speakingMessageId = null;
+			if (generation === ttsGeneration) ttsStopRequested = false;
+		}
 	}
 </script>
 
@@ -965,9 +1248,11 @@
 								messageId={msg.id}
 								{siblingIndex}
 								siblingTotal={siblingIds.length}
+								speaking={speakingMessageId === msg.id}
 								onnavigate={(dir) => handleNavigate(msg.id, dir)}
 								onregenerate={() => handleRegenerate(msg.id)}
 								onedit={(c, o, submit) => handleEditMessage(msg.id, c, o, submit)}
+								onspeak={() => speakMessage(msg.id)}
 								onapprove={handleApprove}
 							/>
 						{/if}

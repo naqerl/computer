@@ -173,6 +173,7 @@
 			try {
 				const tf = new FormData();
 				tf.append('file', new File([audioBlob], audioName, { type: audioBlob.type }));
+				tf.append('workspace', workspace);
 				const res = await fetchJSON<{ text: string }>('/api/audio/transcribe', {
 					method: 'POST',
 					body: tf

@@ -18,6 +18,16 @@
 	let sttApiKey = $state('');
 	let sttModel = $state('whisper-1');
 	let hasExistingKey = $state(false);
+	let ttsBaseUrl = $state('https://api.openai.com/v1');
+	let ttsEnabled = $state(false);
+	let ttsApiKey = $state('');
+	let ttsModel = $state('tts-1');
+	let ttsVoice = $state('alloy');
+	let ttsFormat = $state('mp3');
+	let hasExistingTtsKey = $state(false);
+	let voiceModeSystemPrompt = $state('');
+	const VOICE_MODE_SYSTEM_PROMPT_PLACEHOLDER =
+		'You are in voice mode. Keep responses brief, conversational, and easy to hear aloud. Prefer one or two short paragraphs. Ask at most one focused follow-up question when needed. Avoid long lists, code blocks, tables, and verbose explanations unless the user explicitly asks.';
 
 	onMount(async () => {
 		try {
@@ -30,6 +40,13 @@
 			sttBaseUrl = (config['audio.stt_base_url'] as string) || 'https://api.openai.com/v1';
 			sttModel = (config['audio.stt_model'] as string) || 'whisper-1';
 			hasExistingKey = !!config['audio.stt_api_key'];
+			ttsBaseUrl = (config['audio.tts_base_url'] as string) || 'https://api.openai.com/v1';
+			ttsEnabled = config['audio.tts_enabled'] === true;
+			ttsModel = (config['audio.tts_model'] as string) || 'tts-1';
+			ttsVoice = (config['audio.tts_voice'] as string) || 'alloy';
+			ttsFormat = (config['audio.tts_format'] as string) || 'mp3';
+			hasExistingTtsKey = !!config['audio.tts_api_key'];
+			voiceModeSystemPrompt = (config['audio.voice_mode_system_prompt'] as string) || '';
 		} catch {}
 		loading = false;
 	});
@@ -42,13 +59,23 @@
 				'audio.transcribe_enabled': transcribeEnabled,
 				'audio.recording_quality': quality,
 				'audio.stt_base_url': sttBaseUrl,
-				'audio.stt_model': sttModel
+				'audio.stt_model': sttModel,
+				'audio.tts_enabled': ttsEnabled,
+				'audio.tts_base_url': ttsBaseUrl,
+				'audio.tts_model': ttsModel,
+				'audio.tts_voice': ttsVoice,
+				'audio.tts_format': ttsFormat,
+				'audio.voice_mode_system_prompt': voiceModeSystemPrompt
 			};
 			if (sttApiKey) {
 				cfg['audio.stt_api_key'] = sttApiKey;
 			}
+			if (ttsApiKey) {
+				cfg['audio.tts_api_key'] = ttsApiKey;
+			}
 			await updateConfig(cfg);
 			if (sttApiKey) hasExistingKey = true;
+			if (ttsApiKey) hasExistingTtsKey = true;
 			toast.success($t('settings.saved'));
 			refreshAudioState();
 		} catch {
@@ -137,6 +164,97 @@
 			</div>
 			<p class="text-[11px] text-gray-400 dark:text-gray-600">
 				{$t('admin.audio.sttHint')}
+			</p>
+		</div>
+
+		<!-- Text-to-Speech -->
+		<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2 mt-5">{$t('admin.audio.tts')}</h3>
+
+		<div class="flex flex-col gap-2.5">
+			<label class="flex items-center justify-between cursor-pointer">
+				<span class="text-xs text-gray-600 dark:text-gray-400">{$t('admin.audio.enableTts')}</span>
+				<ToggleSwitch value={ttsEnabled} onchange={(v) => { ttsEnabled = v; }} />
+			</label>
+			<p class="text-[11px] text-gray-400 dark:text-gray-600 -mt-1">
+				{$t('admin.audio.ttsEnabledHint')}
+			</p>
+			<div>
+				<label class="text-xs text-gray-600 dark:text-gray-400" for="tts-base-url">{$t('connections.baseUrl')}</label>
+				<input
+					id="tts-base-url"
+					type="text"
+					bind:value={ttsBaseUrl}
+					placeholder="https://api.openai.com/v1"
+					class="w-full mt-1 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors"
+				/>
+			</div>
+			<div>
+				<label class="text-xs text-gray-600 dark:text-gray-400" for="tts-api-key">{$t('connections.apiKey')}</label>
+				<input
+					id="tts-api-key"
+					type="password"
+					bind:value={ttsApiKey}
+					placeholder={hasExistingTtsKey ? '••••••••' : $t('admin.audio.ttsKeyPlaceholder')}
+					class="w-full mt-1 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors"
+				/>
+			</div>
+			<div>
+				<label class="text-xs text-gray-600 dark:text-gray-400" for="tts-model">{$t('automations.model')}</label>
+				<input
+					id="tts-model"
+					type="text"
+					bind:value={ttsModel}
+					placeholder="tts-1"
+					class="w-full mt-1 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors"
+				/>
+			</div>
+			<div>
+				<label class="text-xs text-gray-600 dark:text-gray-400" for="tts-voice">{$t('admin.audio.ttsVoice')}</label>
+				<input
+					id="tts-voice"
+					type="text"
+					bind:value={ttsVoice}
+					placeholder="alloy"
+					class="w-full mt-1 h-7 px-2 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors"
+				/>
+			</div>
+			<div class="flex items-center justify-between">
+				<span class="text-xs text-gray-600 dark:text-gray-400">{$t('admin.audio.ttsFormat')}</span>
+				<select
+					bind:value={ttsFormat}
+					class="bg-transparent text-xs text-gray-600 dark:text-gray-400 outline-none cursor-pointer"
+				>
+					<option value="mp3">MP3</option>
+					<option value="opus">Opus</option>
+					<option value="aac">AAC</option>
+					<option value="flac">FLAC</option>
+					<option value="wav">WAV</option>
+					<option value="pcm">PCM</option>
+				</select>
+			</div>
+			<p class="text-[11px] text-gray-400 dark:text-gray-600">
+				{$t('admin.audio.ttsHint')}
+			</p>
+		</div>
+
+		<!-- Voice Mode -->
+		<h3 class="text-xs text-gray-400 dark:text-gray-600 mb-2 mt-5">{$t('admin.audio.voiceMode')}</h3>
+
+		<div class="flex flex-col gap-2.5">
+			<div>
+				<label class="text-xs text-gray-600 dark:text-gray-400" for="voice-mode-system-prompt">
+					{$t('admin.audio.voiceModeSystemPrompt')}
+				</label>
+				<textarea
+					id="voice-mode-system-prompt"
+					bind:value={voiceModeSystemPrompt}
+					rows="5"
+					placeholder={VOICE_MODE_SYSTEM_PROMPT_PLACEHOLDER}
+					class="w-full mt-1 px-2 py-1.5 rounded-lg text-xs bg-gray-100 dark:bg-white/6 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/8 outline-none focus:border-blue-400 dark:focus:border-blue-500 transition-colors resize-y min-h-24"
+				></textarea>
+			</div>
+			<p class="text-[11px] text-gray-400 dark:text-gray-600">
+				{$t('admin.audio.voiceModeSystemPromptHint')}
 			</p>
 		</div>
 
