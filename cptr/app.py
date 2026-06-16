@@ -33,6 +33,10 @@ app = FastAPI()
 
 @app.on_event("startup")
 async def startup():
+    from cptr.utils.logger import setup_logging
+
+    setup_logging()
+
     # Use OS certificate store (Windows CertStore, macOS Keychain, etc.)
     # instead of the bundled certifi CA bundle — fixes #31.
     import logging as _logging
@@ -125,6 +129,19 @@ async def auth_middleware(request: Request, call_next):
 
     request.state.auth = auth
     return await call_next(request)
+
+
+from cptr.env import AUDIT_EXCLUDED_PATHS, AUDIT_MAX_BODY_SIZE
+from cptr.utils.audit import AuditLevel, AuditLoggingMiddleware, get_audit_level
+
+audit_level = get_audit_level()
+if audit_level != AuditLevel.NONE:
+    app.add_middleware(
+        AuditLoggingMiddleware,
+        audit_level=audit_level,
+        excluded_paths=AUDIT_EXCLUDED_PATHS,
+        max_body_size=AUDIT_MAX_BODY_SIZE,
+    )
 
 
 # Proxy fallback middleware: intercepts sub-resource requests for proxied

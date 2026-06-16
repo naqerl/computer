@@ -9,12 +9,48 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+
+def _env_bool(name: str, default: str = "false") -> bool:
+    return os.environ.get(name, default).lower() in ("true", "1", "yes", "on")
+
+
+def _env_int(name: str, default: int) -> int:
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
 # ── Data directory ──────────────────────────────────────────
 # Where cptr stores its database, config, and user data.
 # Default: ~/.cptr
 DATA_DIR = Path(os.environ.get("CPTR_DATA_DIR", str(Path.home() / ".cptr")))
 CONFIG_FILE = DATA_DIR / "config.toml"
 DB_FILE = DATA_DIR / "app.db"
+
+# ── Logging ─────────────────────────────────────────────────
+LOG_LEVEL = os.environ.get("CPTR_LOG_LEVEL", "INFO").upper()
+LOG_FORMAT = os.environ.get("CPTR_LOG_FORMAT", "text").lower()
+
+AUDIT_LOG_LEVEL = os.environ.get("CPTR_AUDIT_LOG_LEVEL", "NONE").upper()
+AUDIT_LOG_PATH = Path(
+    os.environ.get("CPTR_AUDIT_LOG_PATH", str(DATA_DIR / "logs" / "audit.jsonl"))
+)
+AUDIT_LOG_ROTATION = os.environ.get("CPTR_AUDIT_LOG_ROTATION", "10 MB")
+AUDIT_MAX_BODY_SIZE = _env_int("CPTR_AUDIT_MAX_BODY_SIZE", 2048)
+AUDIT_EXCLUDED_PATHS = [
+    path.strip()
+    for path in os.environ.get("CPTR_AUDIT_EXCLUDED_PATHS", "/api/chats,/v1/chat").split(",")
+    if path.strip()
+]
+
+LOG_UPSTREAM_REQUESTS = _env_bool("CPTR_LOG_UPSTREAM_REQUESTS", "false")
+UPSTREAM_REQUEST_LOG_PATH = Path(
+    os.environ.get(
+        "CPTR_UPSTREAM_REQUEST_LOG_PATH",
+        str(DATA_DIR / "logs" / "upstream-requests.jsonl"),
+    )
+)
+UPSTREAM_REQUEST_LOG_ROTATION = os.environ.get("CPTR_UPSTREAM_REQUEST_LOG_ROTATION", "50 MB")
 
 # ── Startup token ───────────────────────────────────────────
 # One-time token for first-time setup. Set by CLI, consumed by app.

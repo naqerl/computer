@@ -25,6 +25,7 @@ from cptr.env import (
     STREAM_READ_TIMEOUT_SECONDS,
     STREAM_WRITE_TIMEOUT_SECONDS,
 )
+from cptr.utils.logger import log_upstream_request
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +105,13 @@ async def chat_completion(
                 body["system"] = system
             if request_params:
                 body.update(request_params)
+            log_upstream_request(
+                provider="anthropic",
+                endpoint=f"{base_url}/messages",
+                model=model,
+                api_type="messages",
+                body=body,
+            )
             resp = await client.post(
                 f"{base_url}/messages",
                 json=body,
@@ -124,6 +132,13 @@ async def chat_completion(
                 body_r["instructions"] = system
             if request_params:
                 body_r.update(request_params)
+            log_upstream_request(
+                provider=provider,
+                endpoint=f"{base_url}/responses",
+                model=model,
+                api_type="responses",
+                body=body_r,
+            )
             resp = await client.post(
                 f"{base_url}/responses",
                 json=body_r,
@@ -141,6 +156,13 @@ async def chat_completion(
             }
             if request_params:
                 body_cc.update(request_params)
+            log_upstream_request(
+                provider=provider,
+                endpoint=f"{base_url}/chat/completions",
+                model=model,
+                api_type="chat_completions",
+                body=body_cc,
+            )
             resp = await client.post(
                 f"{base_url}/chat/completions",
                 json=body_cc,
@@ -277,6 +299,13 @@ async def stream_anthropic(
         body.update(request_params)
     # Remove None values
     body = {k: v for k, v in body.items() if v is not None}
+    log_upstream_request(
+        provider="anthropic",
+        endpoint=f"{url}/messages",
+        model=form_data.model,
+        api_type="messages",
+        body=body,
+    )
     headers = {"x-api-key": key, "anthropic-version": "2023-06-01", **_openrouter_headers(url)}
 
     emitted = False
@@ -452,6 +481,13 @@ async def stream_openai_completions(
         body["tools"] = tools
     if request_params:
         body.update(request_params)
+    log_upstream_request(
+        provider="openai",
+        endpoint=f"{url}/chat/completions",
+        model=form_data.model,
+        api_type="chat_completions",
+        body=body,
+    )
     headers = {"Authorization": f"Bearer {key}", **_openrouter_headers(url)}
 
     emitted = False
@@ -682,6 +718,13 @@ async def stream_openai_responses(
         body["tools"] = tools
     if request_params:
         body.update(request_params)
+    log_upstream_request(
+        provider="openai",
+        endpoint=f"{url}/responses",
+        model=form_data.model,
+        api_type="responses",
+        body=body,
+    )
     headers = {"Authorization": f"Bearer {key}", **_openrouter_headers(url)}
 
     emitted = False
