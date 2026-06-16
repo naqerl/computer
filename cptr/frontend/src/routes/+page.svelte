@@ -348,7 +348,7 @@
 				<div class="mb-6">
 					<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('home.recent')}</h2>
 					<div class="flex flex-col">
-						{#each welcomeData.recent as item}
+						{#each welcomeData.recent.slice(0, 5) as item}
 							<button
 								class="flex items-center gap-3 py-1.5 group text-left transition-colors duration-100"
 								onclick={() => quickOpen(item.path)}
@@ -371,7 +371,7 @@
 				<div>
 					<h2 class="text-xs text-gray-400 dark:text-gray-600 mb-2">{$t('home.folders')}</h2>
 					<div class="flex flex-col">
-						{#each welcomeData.suggestions as item}
+						{#each welcomeData.suggestions.slice(0, 5) as item}
 							<button
 								class="flex items-center gap-2 py-1.5 text-[13px] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors duration-100"
 								onclick={() => quickOpen(item.path)}
