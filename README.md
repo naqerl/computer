@@ -12,6 +12,8 @@
 
 ![Cptr Demo](./demo.png)
 
+<sub>See more at [cptr.sh](https://cptr.sh/)</sub>
+
 The computer used to be a room. Then a desk. Then a bag. Now it's a URL.
 
 Your phone goes everywhere with you. You run your life from it. Your computer used to stay home. Now it can come along.
