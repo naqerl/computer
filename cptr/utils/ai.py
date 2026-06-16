@@ -477,16 +477,23 @@ async def stream_openai_completions(
                     tool_calls: dict[int, dict] = {}
                     reasoning_buffer = ""  # Accumulate reasoning_content deltas (Kimi, DeepSeek)
                     reasoning_item: dict | None = None
+
+                    def complete_reasoning_item() -> dict | None:
+                        nonlocal reasoning_buffer, reasoning_item
+                        if reasoning_item is None:
+                            return None
+                        reasoning_item["status"] = "completed"
+                        item = copy.deepcopy(reasoning_item)
+                        reasoning_item = None
+                        reasoning_buffer = ""
+                        return item
+
                     async for line in resp.aiter_lines():
                         if not line.startswith("data: ") or line == "data: [DONE]":
                             continue
                         chunk = json.loads(line[6:])
                         choices = chunk.get("choices", [])
                         delta = choices[0].get("delta", {}) if choices else {}
-
-                        if delta.get("content"):
-                            emitted = True
-                            yield {"type": "text_delta", "content": delta["content"]}
 
                         # Capture reasoning_content from providers like Kimi / DeepSeek
                         if delta.get("reasoning_content"):
@@ -496,6 +503,20 @@ async def stream_openai_completions(
                             reasoning_item["content"][0]["text"] = reasoning_buffer
                             emitted = True
                             yield {"type": "output", "item": copy.deepcopy(reasoning_item)}
+
+                        if delta.get("content"):
+                            item = complete_reasoning_item()
+                            if item is not None:
+                                emitted = True
+                                yield {"type": "output", "item": item}
+                            emitted = True
+                            yield {"type": "text_delta", "content": delta["content"]}
+
+                        if delta.get("tool_calls"):
+                            item = complete_reasoning_item()
+                            if item is not None:
+                                emitted = True
+                                yield {"type": "output", "item": item}
 
                         for tc in delta.get("tool_calls", []):
                             idx = tc["index"]
@@ -509,12 +530,10 @@ async def stream_openai_completions(
 
                         if choices and choices[0].get("finish_reason") == "tool_calls":
                             # Emit accumulated reasoning before tool calls
-                            if reasoning_item is not None:
-                                reasoning_item["status"] = "completed"
+                            item = complete_reasoning_item()
+                            if item is not None:
                                 emitted = True
-                                yield {"type": "output", "item": copy.deepcopy(reasoning_item)}
-                                reasoning_item = None
-                                reasoning_buffer = ""
+                                yield {"type": "output", "item": item}
                             for tc in tool_calls.values():
                                 emitted = True
                                 yield {
@@ -527,12 +546,10 @@ async def stream_openai_completions(
                         if chunk.get("usage"):
                             # Emit any remaining reasoning BEFORE usage
                             # (usage triggers immediate save+return in chat_task)
-                            if reasoning_item is not None:
-                                reasoning_item["status"] = "completed"
+                            item = complete_reasoning_item()
+                            if item is not None:
                                 emitted = True
-                                yield {"type": "output", "item": copy.deepcopy(reasoning_item)}
-                                reasoning_item = None
-                                reasoning_buffer = ""
+                                yield {"type": "output", "item": item}
                             raw = chunk["usage"]
                             emitted = True
                             yield {
@@ -542,10 +559,10 @@ async def stream_openai_completions(
                             }
 
                     # Emit any remaining reasoning if no usage event was received
-                    if reasoning_item is not None:
-                        reasoning_item["status"] = "completed"
+                    item = complete_reasoning_item()
+                    if item is not None:
                         emitted = True
-                        yield {"type": "output", "item": copy.deepcopy(reasoning_item)}
+                        yield {"type": "output", "item": item}
                     emitted = True
                     yield {"type": "done"}
             return

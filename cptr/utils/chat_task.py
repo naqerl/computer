@@ -1108,6 +1108,9 @@ async def run_chat_task(
         nonlocal text_buffer
         if not text_buffer:
             return None
+        if not text_buffer.strip():
+            text_buffer = ""
+            return None
         logger.info(
             "[task %s] flush_text: %d chars into message item", message_id[:8], len(text_buffer)
         )
