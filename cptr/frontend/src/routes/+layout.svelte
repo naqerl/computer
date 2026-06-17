@@ -44,6 +44,7 @@
 	import { refreshChatState, bindGlobalChatListener } from '$lib/stores/chat';
 	import { refreshAudioState } from '$lib/stores/audio';
 	import SetupWizard from '$lib/components/SetupWizard.svelte';
+	import { setupPwa } from '$lib/pwa';
 
 	let { children } = $props();
 	let showSettings = $state(false);
@@ -57,6 +58,8 @@
 	let signupEnabled = $state(false);
 
 	onMount(async () => {
+		const cleanupPwa = setupPwa();
+
 		// Check auth first
 		await checkAuth();
 
@@ -94,7 +97,9 @@
 		// iOS may fire 'scroll' instead of 'resize' when keyboard opens.
 		vv?.addEventListener('resize', syncKeyboardInset);
 		vv?.addEventListener('scroll', syncKeyboardInset);
+
 		return () => {
+			cleanupPwa();
 			clearInterval(healthCheck);
 			document.documentElement.style.removeProperty('--keyboard-inset-bottom');
 			window.removeEventListener('resize', syncKeyboardInset);

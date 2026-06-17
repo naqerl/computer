@@ -329,11 +329,14 @@ async def pwa_manifest():
     name = f"cptr @ {hostname}" if hostname else "cptr"
 
     return {
+        "id": "/",
         "name": name,
         "short_name": "cptr",
-        "description": f"Your computer, from anywhere. v{version}",
+        "description": "Your computer, from anywhere.",
         "start_url": "/",
+        "scope": "/",
         "display": "standalone",
+        "display_override": ["window-controls-overlay", "standalone"],
         "orientation": "any",
         "background_color": "#000000",
         "theme_color": "#000000",
@@ -348,6 +351,8 @@ async def pwa_manifest():
             },
         ],
         "categories": ["developer", "productivity", "utilities"],
+        "prefer_related_applications": False,
+        "related_applications": [],
     }
 
 
