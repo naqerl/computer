@@ -1439,6 +1439,275 @@ async def browser_evaluate(javascript: str, *, __context__: dict) -> str:
     return await client.evaluate(javascript)
 
 
+# ── Memory tool ────────────────────────────────────────────
+
+
+async def memory(
+    action: str,
+    content: str = "",
+    section: str = "general",
+    tags: str = "",
+    memory_id: str = "",
+    *,
+    __context__: dict,
+) -> str:
+    """Manage persistent memories. Use this to remember facts, preferences, and personal details across conversations.
+
+    Actions:
+      - add: Save a new memory (requires content, optional section and comma-separated tags)
+      - remove: Delete a memory by its ID (requires memory_id)
+      - replace: Update an existing memory by ID (requires memory_id + at least one field)
+      - search: Find memories by keyword (requires content as the query)
+      - list: List all memories for this workspace (optional section filter)
+
+    :param action: One of: add, remove, replace, search, list
+    :param content: Content to save (for add) or search query (for search)
+    :param section: Section/category (preferences, facts, personality, general)
+    :param tags: Comma-separated tags
+    :param memory_id: Memory ID (for remove/replace)
+    """
+    from cptr.utils.memory.manager import MemoryManager
+
+    workspace = __context__["workspace"]
+    user_id = __context__.get("user_id", "")
+    tag_list = [t.strip() for t in tags.split(",") if t.strip()] if tags else []
+
+    try:
+        if action == "add":
+            if not content:
+                return json.dumps({"error": "content is required for add"})
+            result = await MemoryManager.add(
+                workspace_id=workspace,
+                content=content,
+                section=section,
+                tags=tag_list,
+                source="user",
+                user_id=user_id,
+            )
+            return json.dumps({"status": "success", "id": result["id"]})
+
+        elif action == "remove":
+            if not memory_id:
+                return json.dumps({"error": "memory_id is required for remove"})
+            ok = await MemoryManager.remove(memory_id)
+            if ok:
+                return json.dumps({"status": "success", "id": memory_id})
+            return json.dumps({"error": "memory not found", "id": memory_id})
+
+        elif action == "replace":
+            if not memory_id:
+                return json.dumps({"error": "memory_id is required for replace"})
+            updates = {}
+            if content:
+                updates["content"] = content
+            if tags:
+                updates["tags"] = tag_list
+            if section != "general":
+                updates["section"] = section
+            ok = await MemoryManager.replace(memory_id, **updates)
+            if ok:
+                return json.dumps({"status": "success", "id": memory_id})
+            return json.dumps({"error": "memory not found", "id": memory_id})
+
+        elif action == "search":
+            if not content:
+                return json.dumps({"error": "content (query) is required for search"})
+            results = await MemoryManager.search(workspace, content)
+            return json.dumps({"results": results, "count": len(results)})
+
+        elif action == "list":
+            # section="general" is default/unset; filter only if non-default
+            section_filter = section if section and section != "general" else None
+            results = await MemoryManager.list_all(
+                workspace, user_id=user_id, section=section_filter
+            )
+            return json.dumps({"results": results, "count": len(results)})
+
+        else:
+            return json.dumps({"error": f"Unknown action: {action}"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
+# ── Skill helpers ───────────────────────────────────────────
+
+
+def _has_frontmatter(text: str) -> bool:
+    """Check if text has YAML frontmatter delimiters."""
+    return bool(re.match(r"\A---\s*\n", text))
+
+
+def _extract_description(text: str) -> str:
+    """Extract a short description from markdown content."""
+    lines = text.strip().splitlines()
+    # Use the first heading or first non-empty line
+    for line in lines:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            # Return heading text without markdown
+            return stripped.lstrip("#").strip()
+    for line in lines:
+        stripped = line.strip()
+        if stripped and not stripped.startswith("```"):
+            return stripped[:120]
+    return ""
+
+
+def _ensure_skill_frontmatter(content: str, name: str) -> str:
+    """Wrap content in proper YAML frontmatter if it doesn't have one."""
+    if _has_frontmatter(content):
+        return content.strip()
+    description = _extract_description(content) or name
+    import yaml
+    fm = {"name": name, "description": description}
+    fm_yaml = yaml.dump(fm, default_flow_style=False).strip()
+    return f"---\n{fm_yaml}\n---\n\n{content.strip()}"
+
+
+# ── Skill management tool ───────────────────────────────────
+
+
+async def skill_manage(
+    action: str,
+    name: str = "",
+    content: str = "",
+    changes: str = "",
+    *,
+    __context__: dict,
+) -> str:
+    """Create, read, update, delete, or archive skills in the workspace.
+
+    Skills are markdown files in .cptr/skills/ that the agent can activate with $skill-name.
+
+    Actions:
+      - create: Write a new skill file (requires name and content)
+      - patch: Load an existing skill, merge changes, and write back
+      - edit: Full replacement of an existing skill (requires name and content)
+      - archive: Move a skill to .cptr/skills/archived/ (preserves it but disables it)
+      - delete: Permanently remove a skill file
+      - list: Show all skill names
+      - view: Show the full content of a skill
+
+    :param action: One of: create, patch, edit, archive, delete, list, view
+    :param name: Skill name (lowercase alphanumeric + hyphens, e.g. 'my-skill')
+    :param content: Full markdown content for the skill (for create/edit)
+    :param changes: For patch — JSON mapping of existing keys to new values
+    """
+    from cptr.utils.skills import discover_skills, load_skill, format_skill_content, parse_frontmatter
+
+    workspace = __context__["workspace"]
+    skills_dir = Path(workspace) / ".cptr" / "skills"
+    archived_dir = skills_dir / "archived"
+
+    try:
+        if action == "list":
+            skills = discover_skills(workspace)
+            names = [s.name for s in skills]
+            return json.dumps({"skills": names, "count": len(names)})
+
+        elif action == "view":
+            skill = load_skill(workspace, name)
+            if not skill:
+                return json.dumps({"error": f"Skill '{name}' not found"})
+            return format_skill_content(skill)
+
+        elif action == "create":
+            if not name or not content:
+                return json.dumps({"error": "name and content are required for create"})
+            # Validate skill name early
+            from cptr.utils.skills import validate_name
+            warnings = validate_name(name, name)
+            if warnings:
+                return json.dumps({"error": f"Invalid skill name: {'; '.join(warnings)}"})
+            skills_dir.mkdir(parents=True, exist_ok=True)
+            skill_dir = skills_dir / name
+            if skill_dir.exists():
+                return json.dumps({"error": f"Skill '{name}' already exists"})
+            skill_dir.mkdir(parents=True, exist_ok=True)
+            skill_md = skill_dir / "SKILL.md"
+            # Ensure content has valid YAML frontmatter for discoverability
+            final_content = _ensure_skill_frontmatter(content, name)
+            skill_md.write_text(final_content + "\n")
+            return json.dumps({"status": "success", "name": name, "action": "created"})
+
+        elif action == "edit":
+            if not name or not content:
+                return json.dumps({"error": "name and content are required for edit"})
+            skill_dir = skills_dir / name
+            if not skill_dir.exists():
+                return json.dumps({"error": f"Skill '{name}' not found"})
+            skill_md = skill_dir / "SKILL.md"
+            # Preserve existing frontmatter if user-provided content has none
+            current_text = skill_md.read_text()
+            if _has_frontmatter(content):
+                final_content = content.strip()
+            else:
+                # Keep existing frontmatter, replace body
+                fm, _body = parse_frontmatter(current_text)
+                if fm:
+                    fm["description"] = fm.get("description") or _extract_description(content)
+                    import yaml
+                    fm_yaml = yaml.dump(fm, default_flow_style=False).strip()
+                    final_content = f"---\n{fm_yaml}\n---\n\n{content.strip()}"
+                else:
+                    final_content = _ensure_skill_frontmatter(content, name)
+            skill_md.write_text(final_content + "\n")
+            return json.dumps({"status": "success", "name": name, "action": "edited"})
+
+        elif action == "patch":
+            if not name or not changes:
+                return json.dumps({"error": "name and changes are required for patch"})
+            skill_dir = skills_dir / name
+            if not skill_dir.exists():
+                return json.dumps({"error": f"Skill '{name}' not found"})
+            try:
+                patch_data = json.loads(changes)
+            except Exception:
+                return json.dumps({"error": "changes must be valid JSON"})
+            skill_md = skill_dir / "SKILL.md"
+            current_text = skill_md.read_text()
+            fm, body = parse_frontmatter(current_text)
+            # Merge patch data into frontmatter
+            for k, v in patch_data.items():
+                fm[k] = v
+            if fm:
+                import yaml
+                fm_yaml = yaml.dump(fm, default_flow_style=False).strip()
+                final = f"---\n{fm_yaml}\n---\n\n{body.strip()}\n"
+            else:
+                # No existing frontmatter; append changes to body
+                final = current_text.rstrip("\n") + "\n" + "\n".join(f"{k}: {v}" for k, v in patch_data.items()) + "\n"
+            skill_md.write_text(final)
+            return json.dumps({"status": "success", "name": name, "action": "patched"})
+
+        elif action == "archive":
+            if not name:
+                return json.dumps({"error": "name is required for archive"})
+            archived_dir.mkdir(parents=True, exist_ok=True)
+            src = skills_dir / name
+            dst = archived_dir / name
+            if not src.exists():
+                return json.dumps({"error": f"Skill '{name}' not found"})
+            src.rename(dst)
+            return json.dumps({"status": "success", "name": name, "action": "archived"})
+
+        elif action == "delete":
+            if not name:
+                return json.dumps({"error": "name is required for delete"})
+            skill_dir = skills_dir / name
+            if not skill_dir.exists():
+                return json.dumps({"error": f"Skill '{name}' not found"})
+            import shutil
+
+            shutil.rmtree(skill_dir)
+            return json.dumps({"status": "success", "name": name, "action": "deleted"})
+
+        else:
+            return json.dumps({"error": f"Unknown action: {action}"})
+    except Exception as e:
+        return json.dumps({"error": str(e)})
+
+
 # ── Registry ────────────────────────────────────────────────
 
 TOOLS: dict[str, dict] = {
@@ -1463,6 +1732,9 @@ TOOLS: dict[str, dict] = {
     "update_automation": {"fn": update_automation, "auto": False},
     "toggle_automation": {"fn": toggle_automation, "auto": False},
     "delete_automation": {"fn": delete_automation, "auto": False},
+    # Self-study loop tools
+    "memory": {"fn": memory, "auto": False},
+    "skill_manage": {"fn": skill_manage, "auto": False},
 }
 
 # Browser tools — conditionally included in schemas based on browser.enabled

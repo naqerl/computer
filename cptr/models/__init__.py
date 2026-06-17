@@ -7,6 +7,7 @@ from cptr.models.config import Config
 from cptr.models.files import File
 from cptr.models.chats import Chat, ChatMessage
 from cptr.models.automations import Automation, AutomationRun
+from cptr.models.memory import Memory
 
 __all__ = [
     "Base",
@@ -20,5 +21,6 @@ __all__ = [
     "ChatMessage",
     "Automation",
     "AutomationRun",
+    "Memory",
 ]
 
