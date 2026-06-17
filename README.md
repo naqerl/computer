@@ -136,6 +136,9 @@ Close the tab. Come back tomorrow on any device. Everything is where you left it
 
 Life is short. Touch grass. Read our [Manifesto](MANIFESTO.md).
 
+> Help us build open, empowering tools that put AI in people's hands.
+> [We're hiring](http://careers.openwebui.com/).
+
 ## Docker
 
 Run cptr with Docker:
