@@ -25,6 +25,7 @@ from cptr.utils.git import (
     log,
     pull,
     push,
+    rename_branch,
     show,
     stage,
     stash_list,
@@ -145,6 +146,12 @@ class DeleteBranchRequest(BaseModel):
     name: str
 
 
+class RenameBranchRequest(BaseModel):
+    root: str
+    old_name: str
+    new_name: str
+
+
 class RootRequest(BaseModel):
     root: str
 
@@ -230,6 +237,16 @@ async def git_delete_branch(body: DeleteBranchRequest):
     """Delete a local branch."""
     try:
         await delete_branch(body.root, body.name)
+        return {"ok": True}
+    except GitError as e:
+        _handle_git_error(e)
+
+
+@router.patch("/branch")
+async def git_rename_branch(body: RenameBranchRequest):
+    """Rename a local branch."""
+    try:
+        await rename_branch(body.root, body.old_name, body.new_name)
         return {"ok": True}
     except GitError as e:
         _handle_git_error(e)

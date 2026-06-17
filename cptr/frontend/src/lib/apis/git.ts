@@ -84,6 +84,20 @@ export const gitUnstash = (root: string, index = 0) =>
 export const createGitBranch = (root: string, name: string) =>
 	fetchJSON('/api/git/branch', jsonBody({ root, name }));
 
+export const renameGitBranch = (root: string, old_name: string, new_name: string) =>
+	fetchJSON('/api/git/branch', {
+		method: 'PATCH',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ root, old_name, new_name })
+	});
+
+export const deleteGitBranch = (root: string, name: string) =>
+	fetchJSON('/api/git/branch', {
+		method: 'DELETE',
+		headers: { 'Content-Type': 'application/json' },
+		body: JSON.stringify({ root, name })
+	});
+
 export const checkoutBranch = (root: string, branch: string) =>
 	fetchJSON('/api/git/checkout', jsonBody({ root, branch }));
 

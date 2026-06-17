@@ -15,6 +15,10 @@
 		check?: boolean;
 		/** Optional keyboard shortcut hint displayed as a single pill on the right. */
 		shortcut?: string;
+		/** Optional trailing action button, e.g. row options. */
+		actionIcon?: string;
+		actionLabel?: string;
+		actionOnclick?: (anchor: HTMLElement) => void;
 	}
 
 	interface Props {
@@ -358,39 +362,55 @@
 				{#if item.divider}
 					<div class="h-px bg-gray-100/50 dark:bg-white/3 mx-1 my-0.5"></div>
 				{:else}
-					<button
-						class="flex items-center gap-2 w-full h-6 px-2 rounded-xl text-xs transition-colors duration-75
+					<div
+						class="group flex items-center gap-1 w-full h-6 rounded-xl text-xs transition-colors duration-75
 							{item.active
 							? 'text-gray-900 dark:text-white bg-gray-50 dark:bg-white/5'
 							: 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/5 hover:text-gray-900 dark:hover:text-white'}"
-						onclick={() => {
-							item.onclick();
-							onclose();
-						}}
 					>
-						{#if item.image}
-							<img src={item.image} alt="" class="w-4 h-4 rounded-full object-cover shrink-0" />
-						{:else if item.icon}
-							<Icon name={item.icon} size={14} />
-						{/if}
-						<span class="flex-1 text-left truncate">{item.label}</span>
-						{#if item.shortcut}
-							<KeyPill text={item.shortcut} class="ml-auto shrink-0" />
-						{/if}
-						{#if item.check && item.active}
-							<svg
-								class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2.5"
-								stroke-linecap="round"
-								stroke-linejoin="round"
+						<button
+							class="flex items-center gap-2 min-w-0 flex-1 h-full px-2 text-inherit"
+							onclick={() => {
+								item.onclick();
+								onclose();
+							}}
+						>
+							{#if item.image}
+								<img src={item.image} alt="" class="w-4 h-4 rounded-full object-cover shrink-0" />
+							{:else if item.icon}
+								<Icon name={item.icon} size={14} />
+							{/if}
+							<span class="flex-1 text-left truncate">{item.label}</span>
+							{#if item.shortcut}
+								<KeyPill text={item.shortcut} class="ml-auto shrink-0" />
+							{/if}
+							{#if item.check && item.active}
+								<svg
+									class="w-3 h-3 shrink-0 text-gray-400 dark:text-gray-500"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2.5"
+									stroke-linecap="round"
+									stroke-linejoin="round"
+								>
+									<polyline points="20 6 9 17 4 12" />
+								</svg>
+							{/if}
+						</button>
+						{#if item.actionIcon && item.actionOnclick}
+							<button
+								class="flex items-center justify-center w-5 h-5 mr-0.5 rounded-lg shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10 transition-all duration-75"
+								aria-label={item.actionLabel}
+								onclick={(e) => {
+									e.stopPropagation();
+									item.actionOnclick?.(e.currentTarget as HTMLElement);
+								}}
 							>
-								<polyline points="20 6 9 17 4 12" />
-							</svg>
+								<Icon name={item.actionIcon} size={12} />
+							</button>
 						{/if}
-					</button>
+					</div>
 				{/if}
 			{/each}
 		{/if}

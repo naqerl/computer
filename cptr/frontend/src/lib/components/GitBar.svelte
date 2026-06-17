@@ -18,7 +18,9 @@
 		gitStash,
 		gitUnstash,
 		checkoutBranch,
-		createGitBranch
+		createGitBranch,
+		deleteGitBranch,
+		renameGitBranch
 	} from '$lib/apis/git';
 	import { gitStatusStore } from '$lib/stores/gitStatus.svelte';
 	import Icon from './Icon.svelte';
@@ -39,6 +41,13 @@
 	type DiffHunk = { header: string; lines: { type: string; content: string }[] };
 	type DiffFile = { path: string; hunks: DiffHunk[] };
 	type Commit = { hash: string; short_hash: string; author: string; date: string; message: string };
+	type BranchItem = {
+		name: string;
+		is_current?: boolean;
+		is_local?: boolean;
+		is_remote?: boolean;
+		upstream?: string | null;
+	};
 
 	let expanded = $state(false);
 	let view = $state<'changes' | 'history'>('changes');
@@ -52,12 +61,14 @@
 		current: string;
 		local: string[];
 		remote: string[];
-		all?: { name: string; is_current?: boolean; is_local?: boolean; upstream?: string | null }[];
+		all?: BranchItem[];
 	} | null>(null);
 	let branchSearch = $state('');
 	let newBranchName = $state('');
 	let creatingBranch = $state(false);
 	let pendingCheckoutBranch = $state<string | null>(null);
+	let pendingCreateBranch = $state<string | null>(null);
+	let branchActionMenu = $state<{ branch: BranchItem; anchor: HTMLElement } | null>(null);
 	let selectedFile = $state<string | null>(null);
 	let selectedCommit = $state<Commit | null>(null);
 	let fileDiff = $state<DiffFile[]>([]);
@@ -105,7 +116,12 @@
 			icon: 'git-branch',
 			active: Boolean(branch.is_current),
 			check: true,
-			onclick: () => switchBranch(branch.name)
+			onclick: () => switchBranch(branch.name),
+			actionIcon: 'three-dots',
+			actionLabel: 'Branch actions',
+			actionOnclick: (anchor: HTMLElement) => {
+				branchActionMenu = { branch, anchor };
+			}
 		}))
 	);
 
@@ -390,13 +406,44 @@
 
 	async function createBranch() {
 		if (!newBranchName.trim()) return;
+		const branch = newBranchName.trim();
+		if (totalChanges > 0) {
+			pendingCreateBranch = branch;
+			creatingBranch = false;
+			showBranches = false;
+			return;
+		}
+		await performBranchCreate(branch, 'bring');
+	}
+
+	async function performBranchCreate(branch: string, changeMode: 'bring' | 'leave') {
 		loading = true;
-		await createGitBranch(workspacePath, newBranchName.trim());
-		newBranchName = '';
-		creatingBranch = false;
-		showBranches = false;
-		loading = false;
-		await refresh();
+		try {
+			if (changeMode === 'leave') {
+				const currentBranch = gitStatus?.branch || 'current branch';
+				const stashResult = (await gitStash(
+					workspacePath,
+					`cptr-branch-switch:${currentBranch}`
+				)) as {
+					ok?: boolean;
+					message?: string;
+				};
+				if (!stashResult.ok) {
+					flash(stashResult.message || 'No changes stashed');
+					return;
+				}
+			}
+			await createGitBranch(workspacePath, branch);
+			newBranchName = '';
+			creatingBranch = false;
+			showBranches = false;
+			pendingCreateBranch = null;
+		} catch (e) {
+			flash(e instanceof Error ? e.message : 'Failed to create branch');
+		} finally {
+			loading = false;
+			await refresh();
+		}
 	}
 
 	function flash(m: string) {
@@ -426,6 +473,45 @@
 
 	function closeCommitMenu() {
 		commitMenu = null;
+	}
+
+	function closeBranchActionMenu() {
+		branchActionMenu = null;
+	}
+
+	async function renameBranch(branch: BranchItem) {
+		if (!branch.is_local) return;
+		const nextName = window.prompt('Rename branch', branch.name)?.trim();
+		if (!nextName || nextName === branch.name) return;
+		try {
+			await renameGitBranch(workspacePath, branch.name, nextName);
+			flash('Branch renamed');
+			closeBranchActionMenu();
+			await refresh({ force: true });
+			await loadBranches();
+		} catch (e) {
+			flash(e instanceof Error ? e.message : 'Failed to rename branch');
+		}
+	}
+
+	function copyBranchName(branch: BranchItem) {
+		navigator.clipboard.writeText(branch.name);
+		flash('Branch name copied');
+		closeBranchActionMenu();
+	}
+
+	async function deleteBranch(branch: BranchItem) {
+		if (!branch.is_local || branch.is_current) return;
+		if (!confirm(`Delete branch "${branch.name}"?`)) return;
+		try {
+			await deleteGitBranch(workspacePath, branch.name);
+			flash('Branch deleted');
+			closeBranchActionMenu();
+			await refresh({ force: true });
+			await loadBranches();
+		} catch (e) {
+			flash(e instanceof Error ? e.message : 'Failed to delete branch');
+		}
 	}
 
 	async function discardFile(path: string) {
@@ -1121,6 +1207,74 @@
 			</div>
 		</div>
 	</Modal>
+{/if}
+
+{#if pendingCreateBranch}
+	<Modal onclose={() => (pendingCreateBranch = null)} class="w-full max-w-sm mx-4">
+		<div class="p-4">
+			<h2 class="text-sm font-medium text-gray-900 dark:text-white">Create branch?</h2>
+			<p class="mt-1.5 text-xs leading-relaxed text-gray-500 dark:text-gray-400">
+				You have {totalChanges} changed {totalChanges === 1 ? 'file' : 'files'} on
+				<span class="font-mono text-gray-700 dark:text-gray-300">{gitStatus?.branch}</span>. Choose
+				whether to leave those changes here or bring them to
+				<span class="font-mono text-gray-700 dark:text-gray-300">{pendingCreateBranch}</span>.
+			</p>
+			<div class="mt-4 flex items-center justify-end gap-2">
+				<button
+					class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+					onclick={() => (pendingCreateBranch = null)}
+				>
+					Cancel
+				</button>
+				<button
+					class="px-2.5 py-1 text-xs text-gray-500 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
+					onclick={() => performBranchCreate(pendingCreateBranch!, 'leave')}
+					disabled={loading}
+				>
+					Leave changes
+				</button>
+				<button
+					class="px-3.5 py-1.5 text-xs bg-black hover:bg-gray-900 text-white dark:bg-white dark:text-black dark:hover:bg-gray-100 transition-colors rounded-full disabled:opacity-50"
+					onclick={() => performBranchCreate(pendingCreateBranch!, 'bring')}
+					disabled={loading}
+				>
+					Bring changes
+				</button>
+			</div>
+		</div>
+	</Modal>
+{/if}
+
+{#if branchActionMenu}
+	<DropdownMenu
+		anchor={branchActionMenu.anchor}
+		items={[
+			...(branchActionMenu.branch.is_local
+				? [
+						{
+							label: 'Rename',
+							icon: 'pencil',
+							onclick: () => renameBranch(branchActionMenu!.branch)
+						}
+					]
+				: []),
+			{
+				label: 'Copy branch name',
+				icon: 'copy',
+				onclick: () => copyBranchName(branchActionMenu!.branch)
+			},
+			...(branchActionMenu.branch.is_local && !branchActionMenu.branch.is_current
+				? [
+						{
+							label: 'Delete',
+							icon: 'xmark',
+							onclick: () => deleteBranch(branchActionMenu!.branch)
+						}
+					]
+				: [])
+		]}
+		onclose={closeBranchActionMenu}
+	/>
 {/if}
 
 {#if contextMenu}

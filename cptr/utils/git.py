@@ -485,6 +485,11 @@ async def delete_branch(root: str, name: str) -> None:
     await _run("branch", "-d", name, cwd=root)
 
 
+async def rename_branch(root: str, old_name: str, new_name: str) -> None:
+    """Rename a local branch."""
+    await _run("branch", "-m", old_name, new_name, cwd=root)
+
+
 async def pull(root: str) -> dict[str, Any]:
     """Pull from remote."""
     code, out, err = await _run("pull", cwd=root, check=False)
