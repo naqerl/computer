@@ -20,11 +20,13 @@ import asyncio
 import hashlib
 import json
 import logging
+import os
 import secrets
 import time
 import uuid
 from pathlib import Path
 
+import httpx
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -195,7 +197,17 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
     from cptr.utils.chat_export import export_chat_to_file
     await export_chat_to_file(chat_id)
 
-    # 5. Create output queue and start the agentic loop
+    # 5. Process attached files from Open WebUI (images → base64, docs → meta.files)
+    body_files = getattr(body, "files", None)
+    if body_files is None:
+        body_files = (body.model_extra or {}).get("files")
+    if body_files and user_msg:
+        try:
+            await _process_openwebui_files(body_files, user_msg)
+        except Exception as exc:
+            logger.warning("Failed to process attached files: %s", exc)
+
+    # 6. Create output queue and start the agentic loop
     output_queue: asyncio.Queue = asyncio.Queue()
 
     from cptr.utils.chat_task import start_task
@@ -209,7 +221,7 @@ async def create_chat_completion(request: Request, body: ChatCompletionRequest):
         output_queue=output_queue,
     )
 
-    # 6. Stream SSE response
+    # 7. Stream SSE response
     completion_id = f"chatcmpl-{assistant_msg.id[:24]}"
     created = int(time.time())
 
@@ -351,6 +363,95 @@ async def _resolve_messages(
         await Chat.update_meta(chat_id, meta, now_ms())
 
     return user_msg, assistant_msg
+
+
+# ── File processing ───────────────────────────────────────────
+
+
+async def _process_openwebui_files(
+    files: list[dict],
+    user_msg: ChatMessage,
+) -> list[dict]:
+    """Download files from Open WebUI and store them in cptr's blob storage.
+
+    Attaches the file metadata to the user message so the agent loop
+    (``_load_message_history``) can convert images to inline base64
+    content blocks and reference documents via ``file://`` URIs.
+
+    Returns the list of successfully processed file metadata dicts.
+    """
+    from cptr.utils.storage import get_storage
+
+    owui_base_url = await Config.get("gateway.open_webui_base_url") or os.environ.get(
+        "OPEN_WEBUI_BASE_URL"
+    )
+    owui_api_key = await Config.get("gateway.open_webui_api_key") or os.environ.get(
+        "OPEN_WEBUI_API_KEY"
+    )
+
+    if not owui_base_url:
+        logger.warning(
+            "Open WebUI base URL not configured (set OPEN_WEBUI_BASE_URL or "
+            "gateway.open_webui_base_url) — skipping file processing"
+        )
+        return []
+
+    storage = get_storage()
+    base = owui_base_url.rstrip("/")
+    processed: list[dict] = []
+
+    async with httpx.AsyncClient() as client:
+        for file_info in files:
+            file_id = file_info.get("id")
+            if not file_id:
+                continue
+
+            # Already stored — just attach metadata
+            existing = await storage.get(file_id)
+            if existing:
+                processed.append(file_info)
+                continue
+
+            # Fetch from Open WebUI's file content endpoint
+            try:
+                headers: dict[str, str] = {}
+                if owui_api_key:
+                    headers["Authorization"] = f"Bearer {owui_api_key}"
+
+                resp = await client.get(
+                    f"{base}/api/files/{file_id}/content",
+                    headers=headers,
+                    timeout=30.0,
+                )
+                if resp.status_code == 200:
+                    try:
+                        # storage.put is synchronous I/O — offload to thread pool
+                        await asyncio.to_thread(storage.put, file_id, resp.content)
+                    except Exception as put_exc:
+                        logger.warning("Failed to store file %s: %s", file_id, put_exc)
+                        continue
+                    processed.append(file_info)
+                else:
+                    logger.warning(
+                        "Failed to fetch file %s from Open WebUI: HTTP %s",
+                        file_id,
+                        resp.status_code,
+                    )
+            except Exception as exc:
+                logger.warning("Error fetching file %s from Open WebUI: %s", file_id, exc)
+
+    if processed:
+        existing_meta = dict(user_msg.meta or {})
+        existing_meta["files"] = processed
+        await ChatMessage.update(user_msg.id, meta=existing_meta)
+        logger.info("Attached %d file(s) to message %s", len(processed), user_msg.id)
+
+        # Re-export so cptr sidebar shows file attachments
+        from cptr.utils.chat_export import export_chat_to_file
+
+        await export_chat_to_file(user_msg.chat_id)
+
+    return processed
 
 
 # ── SSE generator ────────────────────────────────────────────
